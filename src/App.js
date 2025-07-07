@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Shuffle, Users, Plus, Minus, Trash2, Play, RotateCcw } from 'lucide-react';
+import { Shuffle, Users, Plus, Minus, Trash2, RotateCcw } from 'lucide-react';
 
 export default function VolleyballTeamRandomizer() {
   const [players, setPlayers] = useState(['']);
@@ -8,6 +8,7 @@ export default function VolleyballTeamRandomizer() {
   const [sittingOut, setSittingOut] = useState([]);
   const [waitingQueue, setWaitingQueue] = useState([]);
   const [gameHistory, setGameHistory] = useState([]);
+  const [gameMode, setGameMode] = useState('2v2');
   const inputRefs = useRef([]);
   const [shouldFocusLast, setShouldFocusLast] = useState(false);
 
@@ -53,15 +54,38 @@ export default function VolleyballTeamRandomizer() {
     return shuffled;
   };
 
+  const getPlayersPerCourt = (mode) => {
+    return mode === '2v2' ? 4 : mode === '3v3' ? 6 : 8;
+  };
+
+  const handleGameModeChange = (newMode) => {
+    // Reset current game state when changing modes
+    if (teams.length > 0) {
+      setTeams([]);
+      setSittingOut([]);
+      setWaitingQueue([]);
+      setGameHistory([]);
+    }
+    setGameMode(newMode);
+    
+    // Adjust courts if current number exceeds new maximum
+    const newPlayersPerCourt = getPlayersPerCourt(newMode);
+    const newMaxCourts = Math.floor(totalPlayers / newPlayersPerCourt);
+    if (courts > newMaxCourts) {
+      setCourts(Math.max(1, newMaxCourts));
+    }
+  };
+
   const generateTeams = () => {
     const validPlayers = players.filter(p => p.trim() !== '');
     
-    if (validPlayers.length < 4) {
-      alert('Need at least 4 players to form teams!');
+    const playersPerCourt = getPlayersPerCourt(gameMode);
+    const minPlayers = playersPerCourt;
+    
+    if (validPlayers.length < minPlayers) {
+      alert(`Need at least ${minPlayers} players to form teams for ${gameMode} mode!`);
       return;
     }
-
-    const playersPerCourt = 4;
     const totalSpotsAvailable = courts * playersPerCourt;
     
     // Get the most recent game's sitting players (they have priority after guaranteed queue)
@@ -111,13 +135,14 @@ export default function VolleyballTeamRandomizer() {
       const startIndex = court * playersPerCourt;
       const courtPlayers = playingPlayers.slice(startIndex, startIndex + playersPerCourt);
       
-      if (courtPlayers.length === 4) {
-        // Shuffle the 4 players for this court to randomize team assignments
+      if (courtPlayers.length === playersPerCourt) {
+        // Shuffle the players for this court to randomize team assignments
         const shuffledCourtPlayers = shuffleArray(courtPlayers);
+        const teamSize = playersPerCourt / 2;
         newTeams.push({
           court: court + 1,
-          team1: [shuffledCourtPlayers[0], shuffledCourtPlayers[1]],
-          team2: [shuffledCourtPlayers[2], shuffledCourtPlayers[3]]
+          team1: shuffledCourtPlayers.slice(0, teamSize),
+          team2: shuffledCourtPlayers.slice(teamSize)
         });
       }
     }
@@ -143,7 +168,8 @@ export default function VolleyballTeamRandomizer() {
   };
 
   const totalPlayers = players.filter(p => p.trim() !== '').length;
-  const maxCourts = Math.floor(totalPlayers / 4);
+  const playersPerCourt = getPlayersPerCourt(gameMode);
+  const maxCourts = Math.floor(totalPlayers / playersPerCourt);
 
   return (
     <div className="max-w-4xl mx-auto p-6 bg-gradient-to-br from-blue-50 to-yellow-50 min-h-screen">
@@ -153,7 +179,32 @@ export default function VolleyballTeamRandomizer() {
             <Users className="w-8 h-8" />
             Beach Volleyball Team Randomizer
           </h1>
-          <p className="text-gray-600">Fair and random 2v2 team selection for multiple courts</p>
+          <p className="text-gray-600">Fair and random {gameMode} team selection for multiple courts</p>
+        </div>
+
+        {/* Game Mode Selection */}
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold mb-4 text-gray-800">Game Mode</h2>
+          <div className="flex gap-2 justify-center">
+            {['2v2', '3v3', '4v4'].map((mode) => (
+              <button
+                key={mode}
+                onClick={() => handleGameModeChange(mode)}
+                className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+                  gameMode === mode
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                {mode}
+              </button>
+            ))}
+          </div>
+          <p className="text-sm text-gray-500 mt-2 text-center">
+            {gameMode === '2v2' && 'Teams of 2 players each (4 per court)'}
+            {gameMode === '3v3' && 'Teams of 3 players each (6 per court)'}
+            {gameMode === '4v4' && 'Teams of 4 players each (8 per court)'}
+          </p>
         </div>
 
         {/* Player Input Section */}
@@ -214,7 +265,7 @@ export default function VolleyballTeamRandomizer() {
           </div>
           <p className="text-sm text-gray-500 mt-2">
             Max courts with current players: {maxCourts} 
-            {maxCourts === 0 && totalPlayers > 0 && " (need at least 4 players)"}
+            {maxCourts === 0 && totalPlayers > 0 && ` (need at least ${playersPerCourt} players for ${gameMode})`}
           </p>
         </div>
 
@@ -222,7 +273,7 @@ export default function VolleyballTeamRandomizer() {
         <div className="flex gap-4 mb-8">
           <button
             onClick={generateTeams}
-            disabled={totalPlayers < 4}
+            disabled={totalPlayers < playersPerCourt}
             className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 text-lg font-semibold"
           >
             <Shuffle className="w-5 h-5" />
