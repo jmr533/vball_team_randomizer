@@ -23,6 +23,72 @@ const getPlayersPerCourt = (mode) => {
 
 const getPlayerName = (player) => player.name.trim();
 
+const getTeamPartnerships = (team) => {
+  const partnerships = [];
+
+  for (let i = 0; i < team.length; i++) {
+    for (let j = i + 1; j < team.length; j++) {
+      partnerships.push([team[i], team[j]]);
+    }
+  }
+
+  return partnerships;
+};
+
+const getGamePartnerships = (game) => {
+  return (game.teams || []).flatMap((court) => [
+    ...getTeamPartnerships(court.team1 || []).map((players) => ({
+      court: court.court,
+      team: 'A',
+      players
+    })),
+    ...getTeamPartnerships(court.team2 || []).map((players) => ({
+      court: court.court,
+      team: 'B',
+      players
+    }))
+  ]);
+};
+
+const getPartnershipKey = (playerA, playerB) => {
+  return [playerA.id, playerB.id].sort().join(':');
+};
+
+const getPartnershipStats = (games) => {
+  const statsByPair = new Map();
+
+  games.forEach((game) => {
+    getGamePartnerships(game).forEach(({ players }) => {
+      const [playerA, playerB] = players;
+      const key = getPartnershipKey(playerA, playerB);
+      const existingStat = statsByPair.get(key);
+
+      if (existingStat) {
+        existingStat.count += 1;
+        existingStat.games.push(game.gameNumber);
+        return;
+      }
+
+      statsByPair.set(key, {
+        key,
+        players,
+        count: 1,
+        games: [game.gameNumber]
+      });
+    });
+  });
+
+  return Array.from(statsByPair.values()).sort((statA, statB) => {
+    if (statB.count !== statA.count) {
+      return statB.count - statA.count;
+    }
+
+    return statA.players.map(getPlayerName).join(' + ').localeCompare(
+      statB.players.map(getPlayerName).join(' + ')
+    );
+  });
+};
+
 const serializeGame = (game) => ({
   ...game,
   playing: game.playing.map((player) => ({ id: player.id, name: player.name })),
@@ -342,6 +408,8 @@ export default function VolleyballTeamRandomizer() {
   };
 
   const renderNames = (playerList) => playerList.map(getPlayerName).join(', ');
+  const renderPartnership = (players) => players.map(getPlayerName).join(' + ');
+  const partnershipStats = useMemo(() => getPartnershipStats(gameHistory), [gameHistory]);
   const persistenceMessage = {
     idle: '',
     loaded: 'Saved history loaded for this browser.',
@@ -576,6 +644,17 @@ export default function VolleyballTeamRandomizer() {
                       <span className="text-gray-700">{renderNames(game.playing)}</span>
                     </div>
 
+                    {getGamePartnerships(game).length > 0 && (
+                      <div>
+                        <span className="font-medium text-blue-700">Partners: </span>
+                        <span className="text-gray-600">
+                          {getGamePartnerships(game).map((partnership) => (
+                            `${renderPartnership(partnership.players)} (Court ${partnership.court}, Team ${partnership.team})`
+                          )).join('; ')}
+                        </span>
+                      </div>
+                    )}
+
                     {game.sittingOut.length > 0 && (
                       <div>
                         <span className="font-medium text-orange-700">Sat out: </span>
@@ -586,6 +665,24 @@ export default function VolleyballTeamRandomizer() {
                 </div>
               ))}
             </div>
+
+            {partnershipStats.length > 0 && (
+              <div className="mt-6 rounded border bg-white p-4">
+                <h4 className="mb-3 font-semibold text-gray-800">Teammate History</h4>
+                <div className="grid gap-2 text-sm sm:grid-cols-2">
+                  {partnershipStats.map((partnership) => (
+                    <div key={partnership.key} className="flex items-center justify-between gap-3 rounded bg-blue-50 px-3 py-2">
+                      <span className="font-medium text-blue-900">
+                        {renderPartnership(partnership.players)}
+                      </span>
+                      <span className="text-right text-gray-600">
+                        {partnership.count} {partnership.count === 1 ? 'game' : 'games'} · Games {partnership.games.join(', ')}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
