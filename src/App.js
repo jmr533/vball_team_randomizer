@@ -2,6 +2,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Shuffle, Users, Plus, Minus, Trash2, RotateCcw } from 'lucide-react';
 
 const GAME_MODES = ['2v2', '3v3', '4v4'];
+const MAX_COURTS = 4;
+const DEFAULT_COURT_MODES = Array(MAX_COURTS).fill('2v2');
+const ALL_MODE_PREFERENCE = 'Any';
 const SESSION_STORAGE_KEY = 'volleyball-randomizer-session-id';
 
 const createId = (prefix) => {
@@ -12,16 +15,78 @@ const createId = (prefix) => {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 };
 
-const createPlayer = (name = '') => ({
-  id: createId('player'),
-  name
-});
-
 const getPlayersPerCourt = (mode) => {
   return mode === '2v2' ? 4 : mode === '3v3' ? 6 : 8;
 };
 
+const getGameModeDescription = (mode) => {
+  const teamSize = getPlayersPerCourt(mode) / 2;
+  return `Teams of ${teamSize} players each (${getPlayersPerCourt(mode)} per court)`;
+};
+
 const getPlayerName = (player) => player.name.trim();
+
+const normalizePreferredModes = (preferredModes) => {
+  if (!Array.isArray(preferredModes)) {
+    return [...GAME_MODES];
+  }
+
+  const normalizedModes = GAME_MODES.filter((mode) => preferredModes.includes(mode));
+  return normalizedModes.length > 0 ? normalizedModes : [...GAME_MODES];
+};
+
+const normalizePlayer = (player) => {
+  if (player && typeof player === 'object') {
+    return {
+      id: player.id || createId('player'),
+      name: player.name || '',
+      preferredModes: normalizePreferredModes(player.preferredModes)
+    };
+  }
+
+  return {
+    id: createId('player'),
+    name: player || '',
+    preferredModes: [...GAME_MODES]
+  };
+};
+
+const createPlayer = (name = '') => normalizePlayer({ id: createId('player'), name });
+
+const serializePlayer = (player) => ({
+  id: player.id,
+  name: player.name,
+  preferredModes: normalizePreferredModes(player.preferredModes)
+});
+
+const isPlayerEligibleForMode = (player, mode) => {
+  return normalizePreferredModes(player.preferredModes).includes(mode);
+};
+
+const hasAnyModePreference = (player) => {
+  return normalizePreferredModes(player.preferredModes).length === GAME_MODES.length;
+};
+
+const getPreferenceLabel = (player) => {
+  const preferredModes = normalizePreferredModes(player.preferredModes);
+  return preferredModes.length === GAME_MODES.length ? ALL_MODE_PREFERENCE : preferredModes.join(', ');
+};
+
+const getCourtModesFromGame = (game) => {
+  const courtCount = Math.max(1, Math.min(game.courts || 1, MAX_COURTS));
+  const modes = game.courtModes || [];
+  const teamModes = new Map(
+    (game.teams || []).map((court) => [court.court, court.gameMode || game.gameMode || '2v2'])
+  );
+
+  return DEFAULT_COURT_MODES.map((defaultMode, index) => {
+    if (index < courtCount) {
+      return modes[index] || teamModes.get(index + 1) || game.gameMode || defaultMode;
+    }
+
+    return modes[index] || defaultMode;
+  });
+};
 
 const getGameTeamGroups = (game) => {
   return (game.teams || []).flatMap((court) => [
@@ -76,33 +141,59 @@ const getTeamGroupStats = (games) => {
   });
 };
 
+const getPlayerRoundStats = (games) => {
+  const statsByPlayerId = new Map();
+
+  games.forEach((game) => {
+    const gameModes = game.courtModes || (game.teams || []).map((court) => court.gameMode || game.gameMode || '2v2');
+
+    (game.playing || []).forEach((player) => {
+      const stats = statsByPlayerId.get(player.id) || { played: 0, satOut: 0, lastSatOutGame: 0 };
+      stats.played += 1;
+      statsByPlayerId.set(player.id, stats);
+    });
+
+    (game.sittingOut || []).forEach((player) => {
+      const wasEligibleForGame = gameModes.some((mode) => isPlayerEligibleForMode(player, mode));
+
+      if (!wasEligibleForGame) {
+        return;
+      }
+
+      const stats = statsByPlayerId.get(player.id) || { played: 0, satOut: 0, lastSatOutGame: 0 };
+      stats.satOut += 1;
+      stats.lastSatOutGame = Math.max(stats.lastSatOutGame, game.gameNumber || 0);
+      statsByPlayerId.set(player.id, stats);
+    });
+  });
+
+  return statsByPlayerId;
+};
+
 const serializeGame = (game) => ({
   ...game,
-  playing: game.playing.map((player) => ({ id: player.id, name: player.name })),
-  sittingOut: game.sittingOut.map((player) => ({ id: player.id, name: player.name })),
+  playing: game.playing.map(serializePlayer),
+  sittingOut: game.sittingOut.map(serializePlayer),
   teams: game.teams.map((court) => ({
     ...court,
-    team1: court.team1.map((player) => ({ id: player.id, name: player.name })),
-    team2: court.team2.map((player) => ({ id: player.id, name: player.name }))
+    team1: court.team1.map(serializePlayer),
+    team2: court.team2.map(serializePlayer)
   })),
-  playersSnapshot: game.playersSnapshot.map((player) => ({
-    id: player.id,
-    name: player.name
-  }))
+  playersSnapshot: game.playersSnapshot.map(serializePlayer)
 });
 
 const deserializeGame = (game) => {
   const playersById = new Map(
     (game.playersSnapshot || []).map((player) => [
       player.id,
-      { id: player.id || createId('player'), name: player.name || '' }
+      normalizePlayer(player)
     ])
   );
 
   const fromSavedPlayer = (savedPlayer) => {
     if (savedPlayer && typeof savedPlayer === 'object') {
       const id = savedPlayer.id || createId('player');
-      const player = playersById.get(id) || { id, name: savedPlayer.name || '' };
+      const player = playersById.get(id) || normalizePlayer({ ...savedPlayer, id });
       playersById.set(id, player);
       return player;
     }
@@ -138,11 +229,11 @@ const getSessionId = () => {
 export default function VolleyballTeamRandomizer() {
   const [players, setPlayers] = useState([createPlayer()]);
   const [courts, setCourts] = useState(1);
+  const [courtModes, setCourtModes] = useState(DEFAULT_COURT_MODES);
   const [teams, setTeams] = useState([]);
   const [sittingOut, setSittingOut] = useState([]);
   const [waitingQueue, setWaitingQueue] = useState([]);
   const [gameHistory, setGameHistory] = useState([]);
-  const [gameMode, setGameMode] = useState('2v2');
   const [sessionId, setSessionId] = useState('');
   const [persistenceStatus, setPersistenceStatus] = useState('idle');
   const inputRefs = useRef([]);
@@ -153,8 +244,36 @@ export default function VolleyballTeamRandomizer() {
     [players]
   );
   const totalPlayers = validPlayers.length;
-  const playersPerCourt = getPlayersPerCourt(gameMode);
-  const maxCourts = Math.floor(totalPlayers / playersPerCourt);
+  const activeCourtModes = courtModes.slice(0, courts);
+  const totalSpotsRequired = activeCourtModes.reduce(
+    (totalSpots, mode) => totalSpots + getPlayersPerCourt(mode),
+    0
+  );
+  const selectedModeCounts = activeCourtModes.reduce((counts, mode) => ({
+    ...counts,
+    [mode]: (counts[mode] || 0) + getPlayersPerCourt(mode)
+  }), {});
+  const shortageMessages = GAME_MODES.reduce((messages, mode) => {
+    const requiredPlayers = selectedModeCounts[mode] || 0;
+
+    if (requiredPlayers === 0) {
+      return messages;
+    }
+
+    const eligiblePlayers = validPlayers.filter((player) => isPlayerEligibleForMode(player, mode)).length;
+    const shortage = requiredPlayers - eligiblePlayers;
+
+    if (shortage <= 0) {
+      return messages;
+    }
+
+    return [
+      ...messages,
+      `Need ${shortage} more ${mode}-eligible ${shortage === 1 ? 'player' : 'players'}`
+    ];
+  }, []);
+  const shortageMessage = shortageMessages.length > 0 ? `${shortageMessages.join(' and ')}.` : '';
+  const canGenerateTeams = totalPlayers >= totalSpotsRequired && shortageMessages.length === 0;
 
   useEffect(() => {
     setSessionId(getSessionId());
@@ -187,8 +306,8 @@ export default function VolleyballTeamRandomizer() {
         setTeams(latestGame.teams || []);
         setSittingOut(latestGame.sittingOut || []);
         setWaitingQueue(latestGame.sittingOut || []);
-        setGameMode(latestGame.gameMode || '2v2');
-        setCourts(Math.max(1, latestGame.courts || 1));
+        setCourts(Math.max(1, Math.min(latestGame.courts || 1, MAX_COURTS)));
+        setCourtModes(getCourtModesFromGame(latestGame));
 
         if (latestGame.playersSnapshot && latestGame.playersSnapshot.length > 0) {
           setPlayers(latestGame.playersSnapshot);
@@ -207,14 +326,6 @@ export default function VolleyballTeamRandomizer() {
     };
   }, [sessionId]);
 
-  useEffect(() => {
-    const clampedCourts = Math.max(1, Math.min(courts, maxCourts || 1));
-
-    if (courts !== clampedCourts) {
-      setCourts(clampedCourts);
-    }
-  }, [courts, maxCourts]);
-
   const addPlayer = () => {
     setPlayers((currentPlayers) => [...currentPlayers, createPlayer()]);
     setShouldFocusLast(true);
@@ -230,6 +341,36 @@ export default function VolleyballTeamRandomizer() {
       newPlayers[index] = { ...newPlayers[index], name };
       return newPlayers;
     });
+  };
+
+  const updatePlayerPreferredModes = (index, preference) => {
+    if (teams.length > 0) {
+      clearCurrentTeams();
+    }
+
+    setPlayers((currentPlayers) => currentPlayers.map((player, playerIndex) => {
+      if (playerIndex !== index) {
+        return player;
+      }
+
+      const currentPreferredModes = normalizePreferredModes(player.preferredModes);
+
+      if (preference === ALL_MODE_PREFERENCE) {
+        return {
+          ...player,
+          preferredModes: [...GAME_MODES]
+        };
+      }
+
+      const nextPreferredModes = currentPreferredModes.includes(preference)
+        ? currentPreferredModes.filter((mode) => mode !== preference)
+        : [...currentPreferredModes, preference];
+
+      return {
+        ...player,
+        preferredModes: normalizePreferredModes(nextPreferredModes)
+      };
+    }));
   };
 
   const handlePlayerKeyDown = (e, index) => {
@@ -283,80 +424,173 @@ export default function VolleyballTeamRandomizer() {
     }
   };
 
-  const handleGameModeChange = (newMode) => {
+  const clearCurrentTeams = () => {
+    setTeams([]);
+  };
+
+  const handleCourtModeChange = (courtIndex, newMode) => {
     if (teams.length > 0) {
-      setTeams([]);
-      setSittingOut([]);
-      setWaitingQueue([]);
-      setGameHistory([]);
+      clearCurrentTeams();
     }
 
-    setGameMode(newMode);
-    const newMaxCourts = Math.floor(totalPlayers / getPlayersPerCourt(newMode));
-    setCourts((currentCourts) => Math.max(1, Math.min(currentCourts, newMaxCourts || 1)));
+    setCourtModes((currentModes) => (
+      currentModes.map((mode, index) => (index === courtIndex ? newMode : mode))
+    ));
+  };
+
+  const updateCourts = (newCourtCount) => {
+    const clampedCourtCount = Math.max(1, Math.min(newCourtCount, MAX_COURTS));
+
+    if (clampedCourtCount !== courts && teams.length > 0) {
+      clearCurrentTeams();
+    }
+
+    setCourts(clampedCourtCount);
   };
 
   const generateTeams = () => {
-    const minPlayers = playersPerCourt;
-
-    if (validPlayers.length < minPlayers) {
-      alert(`Need at least ${minPlayers} players to form teams for ${gameMode} mode!`);
+    if (shortageMessage) {
+      alert(shortageMessage);
       return;
     }
 
-    const activeCourts = Math.max(1, Math.min(courts, maxCourts));
-    const totalSpotsAvailable = activeCourts * playersPerCourt;
+    if (!canGenerateTeams) {
+      alert(`Need at least ${totalSpotsRequired} players for the selected courts.`);
+      return;
+    }
+
+    const activeCourts = Math.max(1, Math.min(courts, MAX_COURTS));
+    const activeModes = courtModes.slice(0, activeCourts);
+    const totalSpotsAvailable = activeModes.reduce(
+      (totalSpots, mode) => totalSpots + getPlayersPerCourt(mode),
+      0
+    );
     const lastGameSitting = gameHistory.length > 0 ? gameHistory[gameHistory.length - 1].sittingOut : [];
-    const validPlayerIds = new Set(validPlayers.map((player) => player.id));
+    const validPlayersById = new Map(validPlayers.map((player) => [player.id, player]));
     const waitingPlayerIds = new Set(waitingQueue.map((player) => player.id));
     const lastSittingIds = new Set(lastGameSitting.map((player) => player.id));
-    const priorityPlayers = waitingQueue.filter((player) => validPlayerIds.has(player.id));
-    const secondPriorityPlayers = lastGameSitting.filter(
-      (player) => !waitingPlayerIds.has(player.id) && validPlayerIds.has(player.id)
-    );
+    const priorityPlayers = Array.from(waitingPlayerIds)
+      .map((playerId) => validPlayersById.get(playerId))
+      .filter(Boolean);
+    const secondPriorityPlayers = Array.from(lastSittingIds)
+      .filter((playerId) => !waitingPlayerIds.has(playerId))
+      .map((playerId) => validPlayersById.get(playerId))
+      .filter(Boolean);
     const otherPlayers = validPlayers.filter(
       (player) => !waitingPlayerIds.has(player.id) && !lastSittingIds.has(player.id)
     );
-    let allPlayersOrdered = [];
+    const allPlayersOrdered = [
+      ...shuffleArray(priorityPlayers),
+      ...shuffleArray(secondPriorityPlayers),
+      ...shuffleArray(otherPlayers)
+    ];
 
-    if (priorityPlayers.length >= totalSpotsAvailable) {
-      allPlayersOrdered = shuffleArray(priorityPlayers);
-    } else {
-      const remainingSpots = totalSpotsAvailable - priorityPlayers.length;
-
-      if (secondPriorityPlayers.length >= remainingSpots) {
-        allPlayersOrdered = [...priorityPlayers, ...shuffleArray(secondPriorityPlayers)];
-      } else {
-        allPlayersOrdered = [
-          ...priorityPlayers,
-          ...shuffleArray(secondPriorityPlayers),
-          ...shuffleArray(otherPlayers)
-        ];
-      }
-    }
-
-    const playingPlayers = allPlayersOrdered.slice(0, totalSpotsAvailable);
-    const newSittingOut = allPlayersOrdered.slice(totalSpotsAvailable);
+    const remainingPlayers = [...allPlayersOrdered];
+    const playingPlayers = [];
     const newTeams = [];
+    const playerRoundStats = getPlayerRoundStats(gameHistory);
+    const playerPriorityIndex = new Map(
+      allPlayersOrdered.map((player, index) => [player.id, index])
+    );
+    const playerPriorityTier = new Map([
+      ...priorityPlayers.map((player) => [player.id, 0]),
+      ...secondPriorityPlayers.map((player) => [player.id, 1]),
+      ...otherPlayers.map((player) => [player.id, 2])
+    ]);
+    const courtConfigs = activeModes.map((mode, index) => ({
+      court: index + 1,
+      mode,
+      playersPerCourt: getPlayersPerCourt(mode),
+      eligibleCount: validPlayers.filter((player) => isPlayerEligibleForMode(player, mode)).length
+    })).sort((courtA, courtB) => {
+      if (courtA.eligibleCount !== courtB.eligibleCount) {
+        return courtA.eligibleCount - courtB.eligibleCount;
+      }
 
-    for (let court = 0; court < activeCourts; court++) {
-      const startIndex = court * playersPerCourt;
-      const courtPlayers = playingPlayers.slice(startIndex, startIndex + playersPerCourt);
+      return courtB.playersPerCourt - courtA.playersPerCourt;
+    });
+
+    const takeEligiblePlayers = (mode, count) => {
+      const selectedPlayers = remainingPlayers
+        .filter((player) => isPlayerEligibleForMode(player, mode))
+        .sort((playerA, playerB) => {
+          const tierDifference = playerPriorityTier.get(playerA.id) - playerPriorityTier.get(playerB.id);
+
+          if (tierDifference !== 0) {
+            return tierDifference;
+          }
+
+          const playerAStats = playerRoundStats.get(playerA.id) || { played: 0, satOut: 0, lastSatOutGame: 0 };
+          const playerBStats = playerRoundStats.get(playerB.id) || { played: 0, satOut: 0, lastSatOutGame: 0 };
+          const sitOutDifference = playerBStats.satOut - playerAStats.satOut;
+
+          if (sitOutDifference !== 0) {
+            return sitOutDifference;
+          }
+
+          const playedDifference = playerAStats.played - playerBStats.played;
+
+          if (playedDifference !== 0) {
+            return playedDifference;
+          }
+
+          const lastSatOutDifference = playerBStats.lastSatOutGame - playerAStats.lastSatOutGame;
+
+          if (lastSatOutDifference !== 0) {
+            return lastSatOutDifference;
+          }
+
+          const flexibilityDifference = normalizePreferredModes(playerA.preferredModes).length -
+            normalizePreferredModes(playerB.preferredModes).length;
+
+          if (flexibilityDifference !== 0) {
+            return flexibilityDifference;
+          }
+
+          return playerPriorityIndex.get(playerA.id) - playerPriorityIndex.get(playerB.id);
+        })
+        .slice(0, count);
+      const selectedPlayerIds = new Set(selectedPlayers.map((player) => player.id));
+
+      for (let index = remainingPlayers.length - 1; index >= 0; index--) {
+        if (selectedPlayerIds.has(remainingPlayers[index].id)) {
+          remainingPlayers.splice(index, 1);
+        }
+      }
+
+      return shuffleArray(selectedPlayers);
+    };
+
+    courtConfigs.forEach(({ court, mode, playersPerCourt }) => {
+      const courtPlayers = takeEligiblePlayers(mode, playersPerCourt);
 
       if (courtPlayers.length === playersPerCourt) {
         const shuffledCourtPlayers = shuffleArray(courtPlayers);
         const teamSize = playersPerCourt / 2;
+        playingPlayers.push(...courtPlayers);
         newTeams.push({
-          court: court + 1,
+          court,
+          gameMode: mode,
           team1: shuffledCourtPlayers.slice(0, teamSize),
           team2: shuffledCourtPlayers.slice(teamSize)
         });
       }
+    });
+
+    newTeams.sort((courtA, courtB) => courtA.court - courtB.court);
+
+    if (playingPlayers.length !== totalSpotsAvailable || newTeams.length !== activeCourts) {
+      alert('Unable to fill the selected courts with the current player preferences.');
+      return;
     }
+
+    const playingPlayerIds = new Set(playingPlayers.map((player) => player.id));
+    const newSittingOut = allPlayersOrdered.filter((player) => !playingPlayerIds.has(player.id));
 
     const newGame = {
       gameNumber: gameHistory.length + 1,
-      gameMode,
+      gameMode: activeModes[0],
+      courtModes: activeModes,
       courts: activeCourts,
       playing: playingPlayers,
       sittingOut: newSittingOut,
@@ -401,6 +635,9 @@ export default function VolleyballTeamRandomizer() {
   const teamGroupHistoryTitle = teamGroupSizes.size === 1 && teamGroupSizes.has(2)
     ? 'Teammate Pair History'
     : 'Teammate Group History';
+  const selectedCourtSummary = activeCourtModes
+    .map((mode, index) => `Court ${index + 1}: ${mode}`)
+    .join(' | ');
   const persistenceMessage = {
     idle: '',
     loaded: 'Saved history loaded for this browser.',
@@ -418,41 +655,73 @@ export default function VolleyballTeamRandomizer() {
             <Users className="h-8 w-8" />
             Beach Volleyball Team Randomizer
           </h1>
-          <p className="text-gray-600">Fair and random {gameMode} team selection for multiple courts</p>
+          <p className="text-gray-600">Fair and random team selection across up to {MAX_COURTS} courts</p>
           {persistenceMessage && (
             <p className="mt-2 text-xs text-gray-500">{persistenceMessage}</p>
           )}
         </div>
 
         <div className="mb-8">
-          <h2 className="mb-4 text-xl font-semibold text-gray-800">Game Mode</h2>
-          <div className="flex justify-center gap-2">
-            {GAME_MODES.map((mode) => (
-              <button
-                key={mode}
-                onClick={() => handleGameModeChange(mode)}
-                className={`rounded-lg px-6 py-2 font-medium transition-colors ${
-                  gameMode === mode
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-              >
-                {mode}
-              </button>
+          <h2 className="mb-4 text-xl font-semibold text-gray-800">Courts</h2>
+          <div className="mb-5 flex items-center gap-4">
+            <button
+              onClick={() => updateCourts(courts - 1)}
+              disabled={courts <= 1}
+              className="rounded-lg bg-gray-500 px-3 py-2 text-white hover:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label="Remove court"
+            >
+              <Minus className="h-4 w-4" />
+            </button>
+            <span className="min-w-[3rem] text-center text-2xl font-bold text-blue-900">{courts}</span>
+            <button
+              onClick={() => updateCourts(courts + 1)}
+              disabled={courts >= MAX_COURTS}
+              className="rounded-lg bg-gray-500 px-3 py-2 text-white hover:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label="Add court"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            {activeCourtModes.map((mode, courtIndex) => (
+              <div key={courtIndex} className="rounded-lg border border-blue-100 bg-blue-50 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h3 className="font-semibold text-blue-900">Court {courtIndex + 1}</h3>
+                  <span className="text-xs font-medium text-blue-700">{getPlayersPerCourt(mode)} players</span>
+                </div>
+                <div className="flex gap-2">
+                  {GAME_MODES.map((availableMode) => (
+                    <button
+                      key={availableMode}
+                      onClick={() => handleCourtModeChange(courtIndex, availableMode)}
+                      className={`flex-1 rounded-lg px-3 py-2 font-medium transition-colors ${
+                        mode === availableMode
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-100'
+                      }`}
+                    >
+                      {availableMode}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-sm text-gray-500">{getGameModeDescription(mode)}</p>
+              </div>
             ))}
           </div>
-          <p className="mt-2 text-center text-sm text-gray-500">
-            {gameMode === '2v2' && 'Teams of 2 players each (4 per court)'}
-            {gameMode === '3v3' && 'Teams of 3 players each (6 per court)'}
-            {gameMode === '4v4' && 'Teams of 4 players each (8 per court)'}
+          <p className="mt-3 text-sm text-gray-500">
+            Selected courts need {totalSpotsRequired} players total. {selectedCourtSummary}
           </p>
+          {shortageMessage && (
+            <p className="mt-2 text-sm font-medium text-red-600">{shortageMessage}</p>
+          )}
         </div>
 
         <div className="mb-8">
           <h2 className="mb-4 text-xl font-semibold text-gray-800">Add Players</h2>
           <div className="space-y-3">
             {players.map((player, index) => (
-              <div key={player.id} className="flex gap-2">
+              <div key={player.id} className="flex flex-col gap-2 rounded-lg border border-gray-100 bg-gray-50 p-3 sm:flex-row sm:items-center">
                 <input
                   ref={(el) => {
                     inputRefs.current[index] = el;
@@ -462,12 +731,36 @@ export default function VolleyballTeamRandomizer() {
                   value={player.name}
                   onChange={(e) => updatePlayer(index, e.target.value)}
                   onKeyDown={(e) => handlePlayerKeyDown(e, index)}
-                  className="min-w-0 flex-1 rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                  className="min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                 />
+                <div className="flex flex-wrap gap-1 sm:flex-nowrap" aria-label={`Player ${index + 1} mode preferences`}>
+                  {[ALL_MODE_PREFERENCE, ...GAME_MODES].map((preference) => {
+                    const isSelected = preference === ALL_MODE_PREFERENCE
+                      ? hasAnyModePreference(player)
+                      : isPlayerEligibleForMode(player, preference);
+
+                    return (
+                      <button
+                        key={preference}
+                        type="button"
+                        onClick={() => updatePlayerPreferredModes(index, preference)}
+                        className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
+                          isSelected
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-100'
+                        }`}
+                        aria-pressed={isSelected}
+                        title={`${getPlayerName(player) || `Player ${index + 1}`} preferences: ${getPreferenceLabel(player)}`}
+                      >
+                        {preference}
+                      </button>
+                    );
+                  })}
+                </div>
                 {players.length > 1 && (
                   <button
                     onClick={() => removePlayer(index)}
-                    className="rounded-lg bg-red-500 px-3 py-2 text-white transition-colors hover:bg-red-600"
+                    className="self-start rounded-lg bg-red-500 px-3 py-2 text-white transition-colors hover:bg-red-600 sm:self-auto"
                     aria-label={`Remove player ${index + 1}`}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -486,41 +779,16 @@ export default function VolleyballTeamRandomizer() {
           <p className="mt-2 text-sm text-gray-500">Total players: {totalPlayers}</p>
         </div>
 
-        <div className="mb-8">
-          <h2 className="mb-4 text-xl font-semibold text-gray-800">Number of Courts</h2>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setCourts((currentCourts) => Math.max(1, currentCourts - 1))}
-              disabled={courts <= 1}
-              className="rounded-lg bg-gray-500 px-3 py-2 text-white hover:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <Minus className="h-4 w-4" />
-            </button>
-            <span className="min-w-[3rem] text-center text-2xl font-bold text-blue-900">{courts}</span>
-            <button
-              onClick={() => setCourts((currentCourts) => Math.min(maxCourts || 1, currentCourts + 1))}
-              disabled={courts >= maxCourts || maxCourts === 0}
-              className="rounded-lg bg-gray-500 px-3 py-2 text-white hover:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <Plus className="h-4 w-4" />
-            </button>
-          </div>
-          <p className="mt-2 text-sm text-gray-500">
-            Max courts with current players: {maxCourts}
-            {maxCourts === 0 && totalPlayers > 0 && ` (need at least ${playersPerCourt} players for ${gameMode})`}
-          </p>
-        </div>
-
         <div className="mb-8 flex gap-4">
           <button
             onClick={generateTeams}
-            disabled={totalPlayers < playersPerCourt}
+            disabled={!canGenerateTeams}
             className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-lg font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Shuffle className="h-5 w-5" />
             {gameHistory.length === 0 ? 'Generate Random Teams' : `Generate Game ${gameHistory.length + 1}`}
           </button>
-          {teams.length > 0 && (
+          {gameHistory.length > 0 && (
             <button
               onClick={reset}
               className="flex items-center gap-2 rounded-lg bg-gray-500 px-6 py-3 text-white transition-colors hover:bg-gray-600"
@@ -555,7 +823,7 @@ export default function VolleyballTeamRandomizer() {
               <strong>2nd</strong> players who sat out before that, <strong>3rd</strong> everyone else randomly.
             </p>
             <p className="mt-1 text-xs text-green-600">
-              This minimizes total sitting time and keeps repeated names distinct.
+              Player mode preferences are hard rules, so only eligible players are assigned to each court.
             </p>
           </div>
         )}
@@ -570,7 +838,7 @@ export default function VolleyballTeamRandomizer() {
               {teams.map((court) => (
                 <div key={court.court} className="rounded-lg border-2 border-blue-300 bg-gradient-to-br from-blue-100 to-blue-200 p-6">
                   <h3 className="mb-4 text-center text-xl font-bold text-blue-800">
-                    Court {court.court}
+                    Court {court.court} <span className="text-base font-semibold text-blue-600">({court.gameMode || '2v2'})</span>
                   </h3>
 
                   <div className="space-y-4">
@@ -642,6 +910,7 @@ export default function VolleyballTeamRandomizer() {
                           {game.teams.map((court) => (
                             <div key={court.court}>
                               Court {court.court}:{' '}
+                              <span className="font-medium text-gray-700">({court.gameMode || game.gameMode || '2v2'})</span>{' '}
                               <span className="font-medium text-gray-700">Team A</span> {renderNames(court.team1)}
                               {' '}vs{' '}
                               <span className="font-medium text-gray-700">Team B</span> {renderNames(court.team2)}

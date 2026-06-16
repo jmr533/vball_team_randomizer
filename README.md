@@ -1,15 +1,17 @@
 # Beach Volleyball Team Randomizer
 Website: https://vball-team-randomizer.vercel.app/
 
-A React web application that helps organize fair and balanced 2v2 beach volleyball games across multiple courts with intelligent rotation management.
+A React web application that helps organize fair and balanced beach volleyball games across up to four courts with intelligent rotation management.
 
 ## Features
 
 ### Core Functionality
 - **Player Management**: Add and remove players with an intuitive input system
-- **Multi-Court Support**: Configure 1-N courts based on available players (minimum 4 players per court)
+- **Player Mode Preferences**: Mark each player as eligible for Any, 2v2, 3v3, and/or 4v4 games
+- **Multi-Court Support**: Configure 1-4 courts for each round
+- **Per-Court Game Modes**: Choose 2v2, 3v3, or 4v4 independently for each court
 - **Fair Rotation System**: Intelligent algorithm that prioritizes players who sat out previous games
-- **Random Team Generation**: Creates balanced 2v2 teams with randomized partnerships
+- **Random Team Generation**: Creates randomized teams for every selected court while respecting hard player mode preferences
 - **Game History**: Tracks all games and sitting rotations for transparency
 - **Saved Rounds**: Persists generated games with Upstash Redis when Vercel environment variables are configured
 
@@ -23,10 +25,11 @@ A React web application that helps organize fair and balanced 2v2 beach volleyba
 ## How It Works
 
 ### Fair Rotation Algorithm
-1. **Priority 1**: Players who sat out the last game are guaranteed to play next
-2. **Priority 2**: Players who sat out in previous games get secondary priority
-3. **Priority 3**: All other players are randomly selected
-4. **Team Assignment**: Selected players are randomly divided into 2v2 teams
+1. **Eligibility**: Players can only be assigned to courts matching their selected game-mode preferences.
+2. **Priority 1**: Eligible players who sat out the last game are prioritized to play next.
+3. **Priority 2**: Eligible players who sat out in previous games get secondary priority.
+4. **Priority 3**: All other eligible players are randomly selected.
+5. **Team Assignment**: Selected players are randomly divided into teams based on each court's game mode.
 
 This system ensures minimal sitting time and maximum fairness across all players.
 
@@ -83,13 +86,17 @@ The current free Upstash Redis tier is intended for small projects and prototype
 
 1. **Add Players**: Enter player names in the input fields. Press Enter to quickly add the next player.
 
-2. **Set Courts**: Use the +/- buttons to configure the number of courts based on your available playing area.
+2. **Set Player Preferences**: Use Any, 2v2, 3v3, and 4v4 toggles to choose each player's eligible game modes.
 
-3. **Generate Teams**: Click "Generate Random Teams" to create the first game, or "Generate Game X" for subsequent rounds.
+3. **Set Courts**: Use the +/- buttons to configure 1-4 courts based on your available playing area.
 
-4. **Track Progress**: View sitting players and game history to ensure fair rotation.
+4. **Pick Game Modes**: Select 2v2, 3v3, or 4v4 for each active court.
 
-5. **Reset**: Use "Reset All" to start fresh with new players or configuration.
+5. **Generate Teams**: Click "Generate Random Teams" to create the first game, or "Generate Game X" for subsequent rounds.
+
+6. **Track Progress**: View sitting players and game history to ensure fair rotation.
+
+7. **Reset**: Use "Reset All" to start fresh with new players or configuration.
 
 ## Technical Details
 
