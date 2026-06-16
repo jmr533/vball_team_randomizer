@@ -11,7 +11,6 @@ root.render(
 );
 
 // Register service worker for offline support
-// Register service worker for offline support
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js')

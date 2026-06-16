@@ -39,6 +39,7 @@ This is a React-based Progressive Web App (PWA) for organizing fair beach volley
 - **PWA Features**: Service worker (`public/sw.js`) with cache-first strategy for offline support
 - **Styling**: Tailwind CSS for responsive design and component styling
 - **Icons**: Lucide React for consistent iconography
+- **Persistence**: Optional Upstash Redis persistence through Vercel Function `api/games.js`
 - **Focus Management**: Keyboard navigation with automatic focus handling for player input
 
 ### Key Files
@@ -47,6 +48,7 @@ This is a React-based Progressive Web App (PWA) for organizing fair beach volley
 - `src/index.css` - Tailwind CSS imports
 - `public/sw.js` - Service worker for offline caching
 - `public/manifest.json` - PWA manifest configuration
+- `api/games.js` - Serverless API for saving and resetting generated game history
 
 ### State Flow
 1. Players are added to dynamic input array
@@ -57,6 +59,6 @@ This is a React-based Progressive Web App (PWA) for organizing fair beach volley
 
 ### Development Notes
 - Uses Create React App with standard ESLint configuration
-- No backend or database - all state is client-side only
+- Vercel Function persistence is optional; the app behavior should remain usable if `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are missing
 - Designed for Vercel deployment with included `vercel.json`
 - PWA manifest includes offline support and mobile app-like experience
