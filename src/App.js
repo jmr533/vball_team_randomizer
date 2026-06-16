@@ -23,45 +23,32 @@ const getPlayersPerCourt = (mode) => {
 
 const getPlayerName = (player) => player.name.trim();
 
-const getTeamPartnerships = (team) => {
-  const partnerships = [];
-
-  for (let i = 0; i < team.length; i++) {
-    for (let j = i + 1; j < team.length; j++) {
-      partnerships.push([team[i], team[j]]);
-    }
-  }
-
-  return partnerships;
-};
-
-const getGamePartnerships = (game) => {
+const getGameTeamGroups = (game) => {
   return (game.teams || []).flatMap((court) => [
-    ...getTeamPartnerships(court.team1 || []).map((players) => ({
+    {
       court: court.court,
       team: 'A',
-      players
-    })),
-    ...getTeamPartnerships(court.team2 || []).map((players) => ({
+      players: court.team1 || []
+    },
+    {
       court: court.court,
       team: 'B',
-      players
-    }))
-  ]);
+      players: court.team2 || []
+    }
+  ]).filter((teamGroup) => teamGroup.players.length > 0);
 };
 
-const getPartnershipKey = (playerA, playerB) => {
-  return [playerA.id, playerB.id].sort().join(':');
+const getTeamGroupKey = (players) => {
+  return players.map((player) => player.id).sort().join(':');
 };
 
-const getPartnershipStats = (games) => {
-  const statsByPair = new Map();
+const getTeamGroupStats = (games) => {
+  const statsByGroup = new Map();
 
   games.forEach((game) => {
-    getGamePartnerships(game).forEach(({ players }) => {
-      const [playerA, playerB] = players;
-      const key = getPartnershipKey(playerA, playerB);
-      const existingStat = statsByPair.get(key);
+    getGameTeamGroups(game).forEach(({ players }) => {
+      const key = getTeamGroupKey(players);
+      const existingStat = statsByGroup.get(key);
 
       if (existingStat) {
         existingStat.count += 1;
@@ -69,7 +56,7 @@ const getPartnershipStats = (games) => {
         return;
       }
 
-      statsByPair.set(key, {
+      statsByGroup.set(key, {
         key,
         players,
         count: 1,
@@ -78,7 +65,7 @@ const getPartnershipStats = (games) => {
     });
   });
 
-  return Array.from(statsByPair.values()).sort((statA, statB) => {
+  return Array.from(statsByGroup.values()).sort((statA, statB) => {
     if (statB.count !== statA.count) {
       return statB.count - statA.count;
     }
@@ -408,8 +395,12 @@ export default function VolleyballTeamRandomizer() {
   };
 
   const renderNames = (playerList) => playerList.map(getPlayerName).join(', ');
-  const renderPartnership = (players) => players.map(getPlayerName).join(' + ');
-  const partnershipStats = useMemo(() => getPartnershipStats(gameHistory), [gameHistory]);
+  const renderTeamGroup = (players) => players.map(getPlayerName).join(' + ');
+  const teamGroupStats = useMemo(() => getTeamGroupStats(gameHistory), [gameHistory]);
+  const teamGroupSizes = new Set(teamGroupStats.map((teamGroup) => teamGroup.players.length));
+  const teamGroupHistoryTitle = teamGroupSizes.size === 1 && teamGroupSizes.has(2)
+    ? 'Teammate Pair History'
+    : 'Teammate Group History';
   const persistenceMessage = {
     idle: '',
     loaded: 'Saved history loaded for this browser.',
@@ -644,14 +635,19 @@ export default function VolleyballTeamRandomizer() {
                       <span className="text-gray-700">{renderNames(game.playing)}</span>
                     </div>
 
-                    {getGamePartnerships(game).length > 0 && (
+                    {(game.teams || []).length > 0 && (
                       <div>
-                        <span className="font-medium text-blue-700">Partners: </span>
-                        <span className="text-gray-600">
-                          {getGamePartnerships(game).map((partnership) => (
-                            `${renderPartnership(partnership.players)} (Court ${partnership.court}, Team ${partnership.team})`
-                          )).join('; ')}
-                        </span>
+                        <span className="font-medium text-blue-700">Teams: </span>
+                        <div className="mt-1 space-y-1 text-gray-600">
+                          {game.teams.map((court) => (
+                            <div key={court.court}>
+                              Court {court.court}:{' '}
+                              <span className="font-medium text-gray-700">Team A</span> {renderNames(court.team1)}
+                              {' '}vs{' '}
+                              <span className="font-medium text-gray-700">Team B</span> {renderNames(court.team2)}
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
 
@@ -666,17 +662,17 @@ export default function VolleyballTeamRandomizer() {
               ))}
             </div>
 
-            {partnershipStats.length > 0 && (
+            {teamGroupStats.length > 0 && (
               <div className="mt-6 rounded border bg-white p-4">
-                <h4 className="mb-3 font-semibold text-gray-800">Teammate History</h4>
+                <h4 className="mb-3 font-semibold text-gray-800">{teamGroupHistoryTitle}</h4>
                 <div className="grid gap-2 text-sm sm:grid-cols-2">
-                  {partnershipStats.map((partnership) => (
-                    <div key={partnership.key} className="flex items-center justify-between gap-3 rounded bg-blue-50 px-3 py-2">
+                  {teamGroupStats.map((teamGroup) => (
+                    <div key={teamGroup.key} className="flex items-center justify-between gap-3 rounded bg-blue-50 px-3 py-2">
                       <span className="font-medium text-blue-900">
-                        {renderPartnership(partnership.players)}
+                        {renderTeamGroup(teamGroup.players)}
                       </span>
                       <span className="text-right text-gray-600">
-                        {partnership.count} {partnership.count === 1 ? 'game' : 'games'} · Games {partnership.games.join(', ')}
+                        {teamGroup.count} {teamGroup.count === 1 ? 'game' : 'games'} · Games {teamGroup.games.join(', ')}
                       </span>
                     </div>
                   ))}
