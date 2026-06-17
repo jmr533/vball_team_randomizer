@@ -215,20 +215,14 @@ export default function VolleyballTeamRandomizer() {
     const lastGameSitting = gameHistory.length > 0 ? gameHistory[gameHistory.length - 1].sittingOut : [];
     const validPlayersById = new Map(validPlayers.map((player) => [player.id, player]));
     const waitingPlayerIds = new Set(lastGameSitting.map((player) => player.id));
-    const lastSittingIds = new Set(lastGameSitting.map((player) => player.id));
     const priorityPlayers = Array.from(waitingPlayerIds)
       .map((playerId) => validPlayersById.get(playerId))
       .filter(Boolean);
-    const secondPriorityPlayers = Array.from(lastSittingIds)
-      .filter((playerId) => !waitingPlayerIds.has(playerId))
-      .map((playerId) => validPlayersById.get(playerId))
-      .filter(Boolean);
     const otherPlayers = validPlayers.filter(
-      (player) => !waitingPlayerIds.has(player.id) && !lastSittingIds.has(player.id)
+      (player) => !waitingPlayerIds.has(player.id)
     );
     const allPlayersOrdered = [
       ...shuffleArray(priorityPlayers),
-      ...shuffleArray(secondPriorityPlayers),
       ...shuffleArray(otherPlayers)
     ];
 
@@ -241,8 +235,7 @@ export default function VolleyballTeamRandomizer() {
     );
     const playerPriorityTier = new Map([
       ...priorityPlayers.map((player) => [player.id, 0]),
-      ...secondPriorityPlayers.map((player) => [player.id, 1]),
-      ...otherPlayers.map((player) => [player.id, 2])
+      ...otherPlayers.map((player) => [player.id, 1])
     ]);
     const courtConfigs = activeModes.map((mode, index) => ({
       court: index + 1,
@@ -336,13 +329,11 @@ export default function VolleyballTeamRandomizer() {
 
     const newGame = {
       gameNumber: gameHistory.length + 1,
-      gameMode: activeModes[0],
       courtModes: activeModes,
       courts: activeCourts,
       playing: playingPlayers,
       sittingOut: newSittingOut,
       teams: newTeams,
-      playersSnapshot: validPlayers,
       createdAt: new Date().toISOString()
     };
 
@@ -631,7 +622,7 @@ export default function VolleyballTeamRandomizer() {
                           {game.teams.map((court) => (
                             <div key={court.court}>
                               Court {court.court}:{' '}
-                              <span className="font-medium text-gray-700">({court.gameMode || game.gameMode || '2v2'})</span>{' '}
+                              <span className="font-medium text-gray-700">({court.gameMode})</span>{' '}
                               <span className="font-medium text-gray-700">Team A</span> {renderNames(court.team1)}
                               {' '}vs{' '}
                               <span className="font-medium text-gray-700">Team B</span> {renderNames(court.team2)}
