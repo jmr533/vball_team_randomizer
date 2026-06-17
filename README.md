@@ -13,7 +13,6 @@ A React web application that helps organize fair and balanced beach volleyball g
 - **Fair Rotation System**: Intelligent algorithm that prioritizes players who sat out previous games
 - **Random Team Generation**: Creates randomized teams for every selected court while respecting hard player mode preferences
 - **Game History**: Tracks all games and sitting rotations for transparency
-- **Saved Rounds**: Persists generated games with Upstash Redis when Vercel environment variables are configured
 
 ### User Experience
 - **PWA Support**: Works offline with service worker and manifest
@@ -67,21 +66,6 @@ npm run build
 
 This creates a `build` folder with optimized production files.
 
-## Database Setup on Vercel
-
-The app is wired for [Upstash Redis](https://vercel.com/marketplace/upstash) through Vercel Serverless Functions. It still works without a database; generated teams remain client-side if the Upstash environment variables are not present.
-
-To enable saved game history:
-
-1. In Vercel, open the project and install the Upstash Marketplace integration.
-2. Choose Upstash Redis and the free plan for hobby/prototype usage.
-3. Connect the Redis database to this Vercel project so Vercel injects:
-   - `UPSTASH_REDIS_REST_URL`
-   - `UPSTASH_REDIS_REST_TOKEN`
-4. Redeploy the app so the serverless functions receive the new environment variables.
-
-The current free Upstash Redis tier is intended for small projects and prototypes. At the time this was added, Upstash lists 256 MB data size, 10 GB monthly bandwidth, and 500K monthly commands on the free Redis plan.
-
 ## Usage
 
 1. **Add Players**: Enter player names in the input fields. Press Enter to quickly add the next player.
@@ -105,22 +89,21 @@ The current free Upstash Redis tier is intended for small projects and prototype
 - **Styling**: Tailwind CSS for responsive design
 - **Icons**: Lucide React icon library
 - **PWA**: Service worker and manifest for offline functionality
-- **Persistence**: Upstash Redis via Vercel Serverless Functions
-- **Deployment**: Vercel-ready configuration
+- **Deployment**: Vercel-ready static configuration
 
 ### Key Components
 - **State Management**: React hooks (useState, useRef, useEffect)
 - **Player Input**: Dynamic array management with focus handling
 - **Team Generation**: Fisher-Yates shuffle algorithm
-- **History Tracking**: Game state persistence for fairness
+- **History Tracking**: In-session game history for fairness
 
 ### File Structure
 ```
-api/
-├── games.js        # Vercel Function for saved game history
-
 src/
 ├── App.js          # Main application component
+├── gameHelpers.js  # Game logic and fairness helpers
+├── Toast.js        # Toast notifications
+├── useToast.js     # Toast hook
 ├── index.js        # React entry point
 └── index.css       # Tailwind CSS imports
 

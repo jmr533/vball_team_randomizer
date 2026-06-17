@@ -2,7 +2,6 @@ const GAME_MODES = ['2v2', '3v3', '4v4'];
 const MAX_COURTS = 4;
 const DEFAULT_COURT_MODES = Array(MAX_COURTS).fill('2v2');
 const ALL_MODE_PREFERENCE = 'Any';
-const SESSION_STORAGE_KEY = 'volleyball-randomizer-session-id';
 
 const createId = (prefix) => {
   if (window.crypto && window.crypto.randomUUID) {
@@ -17,8 +16,9 @@ const getPlayersPerCourt = (mode) => {
 };
 
 const getGameModeDescription = (mode) => {
-  const teamSize = getPlayersPerCourt(mode) / 2;
-  return `Teams of ${teamSize} players each (${getPlayersPerCourt(mode)} per court)`;
+  const playersPerCourt = getPlayersPerCourt(mode);
+  const teamSize = playersPerCourt / 2;
+  return `Teams of ${teamSize} players each (${playersPerCourt} per court)`;
 };
 
 const getPlayerName = (player) => player.name.trim();
@@ -50,12 +50,6 @@ const normalizePlayer = (player) => {
 
 const createPlayer = (name = '') => normalizePlayer({ id: createId('player'), name });
 
-const serializePlayer = (player) => ({
-  id: player.id,
-  name: player.name,
-  preferredModes: normalizePreferredModes(player.preferredModes)
-});
-
 const isPlayerEligibleForMode = (player, mode) => {
   return normalizePreferredModes(player.preferredModes).includes(mode);
 };
@@ -67,22 +61,6 @@ const hasAnyModePreference = (player) => {
 const getPreferenceLabel = (player) => {
   const preferredModes = normalizePreferredModes(player.preferredModes);
   return preferredModes.length === GAME_MODES.length ? ALL_MODE_PREFERENCE : preferredModes.join(', ');
-};
-
-const getCourtModesFromGame = (game) => {
-  const courtCount = Math.max(1, Math.min(game.courts || 1, MAX_COURTS));
-  const modes = game.courtModes || [];
-  const teamModes = new Map(
-    (game.teams || []).map((court) => [court.court, court.gameMode || game.gameMode || '2v2'])
-  );
-
-  return DEFAULT_COURT_MODES.map((defaultMode, index) => {
-    if (index < courtCount) {
-      return modes[index] || teamModes.get(index + 1) || game.gameMode || defaultMode;
-    }
-
-    return modes[index] || defaultMode;
-  });
 };
 
 const getGameTeamGroups = (game) => {
@@ -167,62 +145,6 @@ const getPlayerRoundStats = (games) => {
   return statsByPlayerId;
 };
 
-const serializeGame = (game) => ({
-  ...game,
-  playing: game.playing.map(serializePlayer),
-  sittingOut: game.sittingOut.map(serializePlayer),
-  teams: game.teams.map((court) => ({
-    ...court,
-    team1: court.team1.map(serializePlayer),
-    team2: court.team2.map(serializePlayer)
-  })),
-  playersSnapshot: game.playersSnapshot.map(serializePlayer)
-});
-
-const deserializeGame = (game) => {
-  const playersById = new Map(
-    (game.playersSnapshot || []).map((player) => [
-      player.id,
-      normalizePlayer(player)
-    ])
-  );
-
-  const fromSavedPlayer = (savedPlayer) => {
-    if (savedPlayer && typeof savedPlayer === 'object') {
-      const id = savedPlayer.id || createId('player');
-      const player = playersById.get(id) || normalizePlayer({ ...savedPlayer, id });
-      playersById.set(id, player);
-      return player;
-    }
-
-    return createPlayer(savedPlayer || '');
-  };
-
-  return {
-    ...game,
-    playing: (game.playing || []).map(fromSavedPlayer),
-    sittingOut: (game.sittingOut || []).map(fromSavedPlayer),
-    teams: (game.teams || []).map((court) => ({
-      ...court,
-      team1: (court.team1 || []).map(fromSavedPlayer),
-      team2: (court.team2 || []).map(fromSavedPlayer)
-    })),
-    playersSnapshot: Array.from(playersById.values())
-  };
-};
-
-const getSessionId = () => {
-  const existingSessionId = window.localStorage.getItem(SESSION_STORAGE_KEY);
-
-  if (existingSessionId) {
-    return existingSessionId;
-  }
-
-  const sessionId = createId('session');
-  window.localStorage.setItem(SESSION_STORAGE_KEY, sessionId);
-  return sessionId;
-};
-
 export {
   GAME_MODES,
   MAX_COURTS,
@@ -232,16 +154,10 @@ export {
   getGameModeDescription,
   getPlayerName,
   normalizePreferredModes,
-  normalizePlayer,
   createPlayer,
-  serializePlayer,
   isPlayerEligibleForMode,
   hasAnyModePreference,
   getPreferenceLabel,
-  getCourtModesFromGame,
   getTeamGroupStats,
-  getPlayerRoundStats,
-  serializeGame,
-  deserializeGame,
-  getSessionId
+  getPlayerRoundStats
 };

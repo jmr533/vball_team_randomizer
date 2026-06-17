@@ -19,13 +19,14 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 This is a React-based Progressive Web App (PWA) for organizing fair beach volleyball team rotation. The application runs entirely in the browser with no backend dependencies.
 
 ### Core Components and State Management
-- **Single Component Architecture**: All logic is contained in `App.js` using React hooks
+- **App Component**: `src/App.js` owns UI state and team generation orchestration
+- **Game Helpers**: `src/gameHelpers.js` holds constants, player utilities, and fairness/stat helpers
 - **State Management**: Uses React's `useState` for all state management:
-  - `players`: Array of player names
+  - `players`: Array of player objects with id, name, and preferredModes
   - `teams`: Generated team matchups per court
   - `gameHistory`: Complete history of all games for fairness tracking
-  - `waitingQueue`: Players guaranteed to play next game
   - `sittingOut`: Players sitting out current game
+  - `waitingQueue`: Derived from the last game's `sittingOut` when between rounds (not separate state)
 
 ### Key Algorithms
 - **Fair Rotation System**: Three-tier priority system ensuring minimal sitting time
@@ -33,32 +34,34 @@ This is a React-based Progressive Web App (PWA) for organizing fair beach volley
   2. Players who sat out in previous games (secondary priority)
   3. Random selection from remaining players
 - **Team Generation**: Fisher-Yates shuffle algorithm for randomizing team assignments
-- **Multi-Court Support**: Dynamically calculates courts based on player count (4 players per court)
+- **Multi-Court Support**: Configure 1-4 courts with independent 2v2/3v3/4v4 modes
 
 ### Technical Architecture
 - **PWA Features**: Service worker (`public/sw.js`) with cache-first strategy for offline support
 - **Styling**: Tailwind CSS for responsive design and component styling
 - **Icons**: Lucide React for consistent iconography
-- **Persistence**: Optional Upstash Redis persistence through Vercel Function `api/games.js`
+- **Toasts**: `src/Toast.js` and `src/useToast.js` for user feedback
 - **Focus Management**: Keyboard navigation with automatic focus handling for player input
 
 ### Key Files
-- `src/App.js` - Main application component containing all game logic
+- `src/App.js` - Main application component and team generation UI
+- `src/gameHelpers.js` - Shared game logic, constants, and fairness helpers
 - `src/index.js` - React entry point with service worker registration
 - `src/index.css` - Tailwind CSS imports
+- `src/Toast.js` - Toast notification component
+- `src/useToast.js` - Toast state hook
 - `public/sw.js` - Service worker for offline caching
 - `public/manifest.json` - PWA manifest configuration
-- `api/games.js` - Serverless API for saving and resetting generated game history
 
 ### State Flow
 1. Players are added to dynamic input array
-2. Court count is calculated based on player count (minimum 4 per court)
+2. Court count and per-court game modes are configured
 3. Team generation uses fairness algorithm to select playing players
 4. Game history tracks sitting patterns for future fairness
-5. Waiting queue ensures players who sat out get priority next game
+5. Between rounds, waiting queue is derived from the previous game's sitting-out list
 
 ### Development Notes
 - Uses Create React App with standard ESLint configuration
-- Vercel Function persistence is optional; the app behavior should remain usable if `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are missing
-- Designed for Vercel deployment with included `vercel.json`
+- Designed for static deployment on Vercel (or any static host) via `vercel.json`
 - PWA manifest includes offline support and mobile app-like experience
+- All game state is in-memory for the current browser session; refresh clears history

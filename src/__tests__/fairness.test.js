@@ -9,7 +9,7 @@ import {
   isPlayerEligibleForMode,
   getPlayerRoundStats,
   getTeamGroupStats
-} from '../App';
+} from '../gameHelpers';
 
 describe('Fairness Algorithm - Helper Functions', () => {
   describe('getPlayersPerCourt', () => {
@@ -270,43 +270,5 @@ describe('Fairness Algorithm - Helper Functions', () => {
       expect(stats[0].count).toBe(2); // p1+p2 appears twice
       expect(stats[1].count).toBe(1); // p1+p3 appears once
     });
-  });
-});
-
-describe('Fairness Algorithm - Priority System', () => {
-  it('should give waiting queue priority (players who sat out last game)', () => {
-    // This is tested implicitly through the full generateTeams test
-    // The waiting queue (last game's sitting out) should be first in priority
-    // when selecting eligible players for the next game
-  });
-
-  it('should give secondary priority to players who sat out before that', () => {
-    // Players with higher satOut counts should be prioritized
-    // This is validated by the sorting logic in generateTeams
-  });
-
-  it('should select remaining players randomly', () => {
-    // The shuffle/randomization for "other" players ensures fairness
-  });
-});
-
-describe('Fairness Algorithm - Edge Cases', () => {
-  it('should handle mode preference mismatches gracefully', () => {
-    // If a player only plays 3v3 but all courts are 2v2,
-    // they should not block team generation
-  });
-
-  it('should handle exact capacity matches', () => {
-    // If player count exactly matches court capacity,
-    // no one should be sitting out
-  });
-
-  it('should handle insufficient players', () => {
-    // Should return appropriate error/alert
-  });
-
-  it('should respect player flexibility in sorting', () => {
-    // More flexible players (can play more modes) should have
-    // lower priority to preserve flexibility for others
   });
 });
