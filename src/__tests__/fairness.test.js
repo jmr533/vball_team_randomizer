@@ -42,8 +42,10 @@ describe('Fairness Algorithm - Helper Functions', () => {
       expect(normalizePreferredModes(['2v2', 'invalid'])).toEqual(['2v2']);
     });
 
-    it('should preserve order of modes', () => {
-      expect(normalizePreferredModes(['4v4', '2v2'])).toEqual(['4v4', '2v2']);
+    it('should return modes in GAME_MODES order for consistency', () => {
+      // normalizePreferredModes filters using GAME_MODES order (2v2, 3v3, 4v4),
+      // not input order, to ensure consistent ordering across the app
+      expect(normalizePreferredModes(['4v4', '2v2'])).toEqual(['2v2', '4v4']);
     });
 
     it('should return all modes as fallback if no valid modes', () => {
