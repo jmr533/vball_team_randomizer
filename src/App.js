@@ -3,12 +3,48 @@ import { Shuffle, Users, Plus, Minus, Trash2, RotateCcw } from 'lucide-react';
 import { ToastContainer } from './Toast';
 import { useToast } from './useToast';
 
+/**
+ * Beach Volleyball Team Randomizer
+ * 
+ * A fair, random team assignment system that ensures:
+ * 1. Players who sat out last game get priority to play next game
+ * 2. Mode preferences are respected as hard rules (can't force someone into incompatible mode)
+ * 3. Overall playing time is balanced across sessions
+ * 4. Teammate pairings are distributed to avoid same pairs every game
+ * 
+ * State Management:
+ * - players: Array of Player objects with id, name, and preferredModes
+ * - courts: Number of simultaneous courts (1-4)
+ * - courtModes: Game mode for each court (2v2, 3v3, 4v4)
+ * - teams: Current game's teams organized by court
+ * - sittingOut: Players not playing in current game
+ * - gameHistory: All previous games with teams and stats
+ * - persistenceStatus: Database sync status (idle, saving, saved, unavailable)
+ * 
+ * Fairness Algorithm (generateTeams):
+ * Priority Tiers for player selection:
+ * 1. Players in waitingQueue (sat out last game) - shuffled randomly within tier
+ * 2. Players who sat out before that - prioritized by times sat out
+ * 3. Everyone else - sorted by: plays count (fewest first) > last sat out game (oldest first) > flexibility (least flexible first)
+ * 
+ * For each court:
+ * - Select eligible players (respecting mode preferences)
+ * - Shuffle their order before splitting into teams
+ * - This ensures mode constraints don't create predictable team patterns
+ */
+
 const GAME_MODES = ['2v2', '3v3', '4v4'];
 const MAX_COURTS = 4;
 const DEFAULT_COURT_MODES = Array(MAX_COURTS).fill('2v2');
 const ALL_MODE_PREFERENCE = 'Any';
 const SESSION_STORAGE_KEY = 'volleyball-randomizer-session-id';
 
+/**
+ * Generate a unique ID with the given prefix
+ * Uses Web Crypto API when available, falls back to timestamp + random
+ * @param {string} prefix - The prefix for the ID (e.g., 'player', 'session')
+ * @returns {string} A unique identifier prefixed with the given string
+ */
 const createId = (prefix) => {
   if (window.crypto && window.crypto.randomUUID) {
     return `${prefix}-${window.crypto.randomUUID()}`;
@@ -17,6 +53,11 @@ const createId = (prefix) => {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 };
 
+/**
+ * Get total number of players required for a game mode
+ * @param {string} mode - Game mode: '2v2' (4 players), '3v3' (6 players), or '4v4' (8 players)
+ * @returns {number} Total players needed for the mode (sum of both teams)
+ */
 const getPlayersPerCourt = (mode) => {
   return mode === '2v2' ? 4 : mode === '3v3' ? 6 : 8;
 };
@@ -28,6 +69,12 @@ const getGameModeDescription = (mode) => {
 
 const getPlayerName = (player) => player.name.trim();
 
+/**
+ * Normalize player mode preferences to valid game modes
+ * Ensures data consistency by filtering to only GAME_MODES and returning in standard order
+ * @param {Array<string>|any} preferredModes - Player's preferred game modes
+ * @returns {Array<string>} Valid modes in canonical order; returns all modes if empty or invalid
+ */
 const normalizePreferredModes = (preferredModes) => {
   if (!Array.isArray(preferredModes)) {
     return [...GAME_MODES];
@@ -37,6 +84,12 @@ const normalizePreferredModes = (preferredModes) => {
   return normalizedModes.length > 0 ? normalizedModes : [...GAME_MODES];
 };
 
+/**
+ * Normalize and validate player data ensuring all required fields exist
+ * Handles both object and string inputs for flexibility
+ * @param {Object|string|any} player - Raw player data to normalize
+ * @returns {Object} Normalized player object with id, name, and preferredModes
+ */
 const normalizePlayer = (player) => {
   if (player && typeof player === 'object') {
     return {
@@ -61,6 +114,12 @@ const serializePlayer = (player) => ({
   preferredModes: normalizePreferredModes(player.preferredModes)
 });
 
+/**
+ * Check if a player can play a specific game mode
+ * @param {Object} player - Player object with preferredModes array
+ * @param {string} mode - Game mode to check eligibility for
+ * @returns {boolean} True if player can play this mode, false otherwise
+ */
 const isPlayerEligibleForMode = (player, mode) => {
   return normalizePreferredModes(player.preferredModes).includes(mode);
 };
@@ -109,6 +168,13 @@ const getTeamGroupKey = (players) => {
   return players.map((player) => player.id).sort().join(':');
 };
 
+/**
+ * Calculate teammate pairing statistics across game history
+ * Tracks which players have been on the same team together and how frequently
+ * Used for the "Teammate Pair History" display showing team combinations
+ * @param {Array<Object>} games - Array of all games in history
+ * @returns {Array<Object>} Sorted array of team groups with count and game numbers
+ */
 const getTeamGroupStats = (games) => {
   const statsByGroup = new Map();
 
@@ -143,6 +209,13 @@ const getTeamGroupStats = (games) => {
   });
 };
 
+/**
+ * Calculate fairness statistics for all players across game history
+ * Tracks how many times each player played vs sat out, and when they last sat out
+ * Used by fairness algorithm to ensure equitable distribution of playing time
+ * @param {Array<Object>} games - Array of all games in history
+ * @returns {Map<string, Object>} Map of playerId -> {played, satOut, lastSatOutGame}
+ */
 const getPlayerRoundStats = (games) => {
   const statsByPlayerId = new Map();
 
