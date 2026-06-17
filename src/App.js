@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Shuffle, Users, Plus, Minus, Trash2, RotateCcw } from 'lucide-react';
+import { ToastContainer } from './Toast';
+import { useToast } from './useToast';
 
 const GAME_MODES = ['2v2', '3v3', '4v4'];
 const MAX_COURTS = 4;
@@ -238,6 +240,7 @@ export default function VolleyballTeamRandomizer() {
   const [persistenceStatus, setPersistenceStatus] = useState('idle');
   const inputRefs = useRef([]);
   const [shouldFocusLast, setShouldFocusLast] = useState(false);
+  const { toasts, dismiss, success, error, info } = useToast();
 
   const validPlayers = useMemo(
     () => players.filter((player) => getPlayerName(player) !== ''),
@@ -314,6 +317,9 @@ export default function VolleyballTeamRandomizer() {
         }
 
         setPersistenceStatus('loaded');
+        if (isMounted) {
+          info('Game history loaded from previous session');
+        }
       } catch (error) {
         setPersistenceStatus('unavailable');
       }
@@ -418,9 +424,15 @@ export default function VolleyballTeamRandomizer() {
       });
 
       const data = await response.json().catch(() => ({}));
-      setPersistenceStatus(response.ok && data.persistence === 'enabled' ? 'saved' : 'unavailable');
+      const isSaved = response.ok && data.persistence === 'enabled';
+      setPersistenceStatus(isSaved ? 'saved' : 'unavailable');
+      
+      if (!isSaved) {
+        info('Game saved locally (database unavailable)');
+      }
     } catch (error) {
       setPersistenceStatus('unavailable');
+      info('Game saved locally (database connection error)');
     }
   };
 
@@ -450,12 +462,12 @@ export default function VolleyballTeamRandomizer() {
 
   const generateTeams = () => {
     if (shortageMessage) {
-      alert(shortageMessage);
+      error(shortageMessage);
       return;
     }
 
     if (!canGenerateTeams) {
-      alert(`Need at least ${totalSpotsRequired} players for the selected courts.`);
+      error(`Need at least ${totalSpotsRequired} players for the selected courts.`);
       return;
     }
 
@@ -580,7 +592,7 @@ export default function VolleyballTeamRandomizer() {
     newTeams.sort((courtA, courtB) => courtA.court - courtB.court);
 
     if (playingPlayers.length !== totalSpotsAvailable || newTeams.length !== activeCourts) {
-      alert('Unable to fill the selected courts with the current player preferences.');
+      error('Unable to fill courts. Check player preferences and try again.');
       return;
     }
 
@@ -604,6 +616,7 @@ export default function VolleyballTeamRandomizer() {
     setSittingOut(newSittingOut);
     setWaitingQueue(newSittingOut);
     setGameHistory((previousGames) => [...previousGames, newGame]);
+    success(`Game ${newGame.gameNumber} generated successfully!`);
     saveGame(newGame);
   };
 
@@ -612,6 +625,7 @@ export default function VolleyballTeamRandomizer() {
     setSittingOut([]);
     setWaitingQueue([]);
     setGameHistory([]);
+    success('All games reset successfully!');
 
     if (!sessionId) {
       return;
@@ -622,9 +636,14 @@ export default function VolleyballTeamRandomizer() {
         method: 'DELETE'
       });
       const data = await response.json().catch(() => ({}));
-      setPersistenceStatus(response.ok && data.persistence === 'enabled' ? 'reset' : 'unavailable');
+      const isReset = response.ok && data.persistence === 'enabled';
+      setPersistenceStatus(isReset ? 'reset' : 'unavailable');
+      
+      if (!isReset) {
+        info('Game history cleared locally');
+      }
     } catch (error) {
-      setPersistenceStatus('unavailable');
+      info('Game history cleared locally');
     }
   };
 
@@ -951,6 +970,16 @@ export default function VolleyballTeamRandomizer() {
           </div>
         )}
       </div>
+      <ToastContainer toasts={toasts} onDismiss={dismiss} />
     </div>
   );
 }
+
+// Export helper functions for testing
+export {
+  getPlayersPerCourt,
+  normalizePreferredModes,
+  isPlayerEligibleForMode,
+  getPlayerRoundStats,
+  getTeamGroupStats
+};
