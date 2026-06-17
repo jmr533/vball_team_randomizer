@@ -28,9 +28,7 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  const requestUrl = new URL(event.request.url);
-
-  if (event.request.method !== 'GET' || requestUrl.pathname.startsWith('/api/')) {
+  if (event.request.method !== 'GET') {
     return;
   }
 
