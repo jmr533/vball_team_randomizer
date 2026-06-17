@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Shuffle, Users, Plus, Minus, Trash2, RotateCcw } from 'lucide-react';
 import { ToastContainer } from './Toast';
 import { useToast } from './useToast';
-import { saveGame as persistSaveGame, deleteGames as persistDeleteGames } from './services/persistenceService';
 import {
   GAME_MODES,
   MAX_COURTS,
@@ -16,12 +15,8 @@ import {
   isPlayerEligibleForMode,
   hasAnyModePreference,
   getPreferenceLabel,
-  getCourtModesFromGame,
   getTeamGroupStats,
-  getPlayerRoundStats,
-  serializeGame,
-  deserializeGame,
-  getSessionId
+  getPlayerRoundStats
 } from './gameHelpers';
 
 /**
@@ -40,7 +35,6 @@ import {
  * - teams: Current game's teams organized by court
  * - sittingOut: Players not playing in current game
  * - gameHistory: All previous games with teams and stats
- * - persistenceStatus: Database sync status (idle, saving, saved, unavailable)
  * 
  * Fairness Algorithm (generateTeams):
  * Priority Tiers for player selection:
@@ -60,13 +54,10 @@ export default function VolleyballTeamRandomizer() {
   const [courtModes, setCourtModes] = useState(DEFAULT_COURT_MODES);
   const [teams, setTeams] = useState([]);
   const [sittingOut, setSittingOut] = useState([]);
-  const [waitingQueue, setWaitingQueue] = useState([]);
   const [gameHistory, setGameHistory] = useState([]);
-  const [sessionId, setSessionId] = useState('');
-  const [persistenceStatus, setPersistenceStatus] = useState('idle');
   const inputRefs = useRef([]);
   const [shouldFocusLast, setShouldFocusLast] = useState(false);
-  const { toasts, dismiss, success, error, info } = useToast();
+  const { toasts, dismiss, success, error } = useToast();
 
   const validPlayers = useMemo(
     () => players.filter((player) => getPlayerName(player) !== ''),
@@ -103,60 +94,9 @@ export default function VolleyballTeamRandomizer() {
   }, []);
   const shortageMessage = shortageMessages.length > 0 ? `${shortageMessages.join(' and ')}.` : '';
   const canGenerateTeams = totalPlayers >= totalSpotsRequired && shortageMessages.length === 0;
-
-  useEffect(() => {
-    setSessionId(getSessionId());
-  }, []);
-
-  useEffect(() => {
-    if (!sessionId) {
-      return;
-    }
-
-    let isMounted = true;
-
-    const loadSavedGames = async () => {
-      try {
-        const response = await fetch(`/api/games?sessionId=${encodeURIComponent(sessionId)}`);
-
-        if (!response.ok) {
-          return;
-        }
-
-        const data = await response.json();
-        const savedGames = Array.isArray(data.games) ? data.games.map(deserializeGame) : [];
-
-        if (!isMounted || savedGames.length === 0) {
-          return;
-        }
-
-        const latestGame = savedGames[savedGames.length - 1];
-        setGameHistory(savedGames);
-        setTeams(latestGame.teams || []);
-        setSittingOut(latestGame.sittingOut || []);
-        setWaitingQueue(latestGame.sittingOut || []);
-        setCourts(Math.max(1, Math.min(latestGame.courts || 1, MAX_COURTS)));
-        setCourtModes(getCourtModesFromGame(latestGame));
-
-        if (latestGame.playersSnapshot && latestGame.playersSnapshot.length > 0) {
-          setPlayers(latestGame.playersSnapshot);
-        }
-
-        setPersistenceStatus('loaded');
-        if (isMounted) {
-          info('Game history loaded from previous session');
-        }
-      } catch (error) {
-        setPersistenceStatus('unavailable');
-      }
-    };
-
-    loadSavedGames();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [sessionId, info]);
+  const waitingQueue = teams.length === 0 && gameHistory.length > 0
+    ? gameHistory[gameHistory.length - 1].sittingOut || []
+    : [];
 
   const addPlayer = () => {
     setPlayers((currentPlayers) => [...currentPlayers, createPlayer()]);
@@ -231,23 +171,6 @@ export default function VolleyballTeamRandomizer() {
     return shuffled;
   };
 
-  /**
-   * Save a game to database using persistence service
-   * Handles errors gracefully - game still works locally even if database is down
-   */
-  const saveGame = async (game) => {
-    if (!sessionId) {
-      return;
-    }
-
-    const result = await persistSaveGame(sessionId, serializeGame(game));
-    setPersistenceStatus(result.persistence);
-
-    if (!result.success) {
-      console.error('Failed to save game');
-    }
-  };
-
   const clearCurrentTeams = () => {
     setTeams([]);
   };
@@ -291,7 +214,7 @@ export default function VolleyballTeamRandomizer() {
     );
     const lastGameSitting = gameHistory.length > 0 ? gameHistory[gameHistory.length - 1].sittingOut : [];
     const validPlayersById = new Map(validPlayers.map((player) => [player.id, player]));
-    const waitingPlayerIds = new Set(waitingQueue.map((player) => player.id));
+    const waitingPlayerIds = new Set(lastGameSitting.map((player) => player.id));
     const lastSittingIds = new Set(lastGameSitting.map((player) => player.id));
     const priorityPlayers = Array.from(waitingPlayerIds)
       .map((playerId) => validPlayersById.get(playerId))
@@ -382,7 +305,7 @@ export default function VolleyballTeamRandomizer() {
         }
       }
 
-      return shuffleArray(selectedPlayers);
+      return selectedPlayers;
     };
 
     courtConfigs.forEach(({ court, mode, playersPerCourt }) => {
@@ -426,29 +349,15 @@ export default function VolleyballTeamRandomizer() {
     setCourts(activeCourts);
     setTeams(newTeams);
     setSittingOut(newSittingOut);
-    setWaitingQueue(newSittingOut);
     setGameHistory((previousGames) => [...previousGames, newGame]);
     success(`Game ${newGame.gameNumber} generated successfully!`);
-    saveGame(newGame);
   };
 
-  /**
-   * Reset all games and clear database using persistence service
-   * Clears both local state and database
-   */
-  const reset = async () => {
+  const reset = () => {
     setTeams([]);
     setSittingOut([]);
-    setWaitingQueue([]);
     setGameHistory([]);
     success('All games reset successfully!');
-
-    if (!sessionId) {
-      return;
-    }
-
-    const result = await persistDeleteGames(sessionId);
-    setPersistenceStatus(result.persistence);
   };
 
   const renderNames = (playerList) => playerList.map(getPlayerName).join(', ');
@@ -461,14 +370,6 @@ export default function VolleyballTeamRandomizer() {
   const selectedCourtSummary = activeCourtModes
     .map((mode, index) => `Court ${index + 1}: ${mode}`)
     .join(' | ');
-  const persistenceMessage = {
-    idle: '',
-    loaded: 'Saved history loaded for this browser.',
-    saving: 'Saving game history...',
-    saved: 'Game history saved.',
-    reset: 'Saved history reset.',
-    unavailable: 'Database unavailable; games still work locally.'
-  }[persistenceStatus];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-amber-50 p-4 sm:p-6">
@@ -479,9 +380,6 @@ export default function VolleyballTeamRandomizer() {
             Beach Volleyball Team Randomizer
           </h1>
           <p className="text-gray-600">Fair and random team selection across up to {MAX_COURTS} courts</p>
-          {persistenceMessage && (
-            <p className="mt-2 text-xs text-gray-500">{persistenceMessage}</p>
-          )}
         </div>
 
         <div className="mb-8">
@@ -778,12 +676,3 @@ export default function VolleyballTeamRandomizer() {
     </div>
   );
 }
-
-// Export helper functions for testing
-export {
-  getPlayersPerCourt,
-  normalizePreferredModes,
-  isPlayerEligibleForMode,
-  getPlayerRoundStats,
-  getTeamGroupStats
-};
