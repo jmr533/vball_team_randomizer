@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Shuffle, Users, Plus, Minus, Trash2, RotateCcw } from 'lucide-react';
 import { ToastContainer } from './Toast';
 import { useToast } from './useToast';
+import { usePersistence } from './hooks/usePersistence';
+import { saveGame as persistSaveGame, deleteGames as persistDeleteGames } from './services/persistenceService';
 
 /**
  * Beach Volleyball Team Randomizer
@@ -314,6 +316,7 @@ export default function VolleyballTeamRandomizer() {
   const inputRefs = useRef([]);
   const [shouldFocusLast, setShouldFocusLast] = useState(false);
   const { toasts, dismiss, success, error, info } = useToast();
+  const { status: persistenceApiStatus, load: loadGamesFromDb } = usePersistence();
 
   const validPlayers = useMemo(
     () => players.filter((player) => getPlayerName(player) !== ''),
@@ -403,7 +406,7 @@ export default function VolleyballTeamRandomizer() {
     return () => {
       isMounted = false;
     };
-  }, [sessionId]);
+  }, [sessionId, info]);
 
   const addPlayer = () => {
     setPlayers((currentPlayers) => [...currentPlayers, createPlayer()]);
@@ -478,34 +481,20 @@ export default function VolleyballTeamRandomizer() {
     return shuffled;
   };
 
+  /**
+   * Save a game to database using persistence service
+   * Handles errors gracefully - game still works locally even if database is down
+   */
   const saveGame = async (game) => {
     if (!sessionId) {
       return;
     }
 
-    try {
-      setPersistenceStatus('saving');
-      const response = await fetch('/api/games', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          sessionId,
-          game: serializeGame(game)
-        })
-      });
+    const result = await persistSaveGame(sessionId, serializeGame(game));
+    setPersistenceStatus(result.persistence);
 
-      const data = await response.json().catch(() => ({}));
-      const isSaved = response.ok && data.persistence === 'enabled';
-      setPersistenceStatus(isSaved ? 'saved' : 'unavailable');
-      
-      if (!isSaved) {
-        info('Game saved locally (database unavailable)');
-      }
-    } catch (error) {
-      setPersistenceStatus('unavailable');
-      info('Game saved locally (database connection error)');
+    if (!result.success) {
+      console.error('Failed to save game');
     }
   };
 
@@ -693,6 +682,10 @@ export default function VolleyballTeamRandomizer() {
     saveGame(newGame);
   };
 
+  /**
+   * Reset all games and clear database using persistence service
+   * Clears both local state and database
+   */
   const reset = async () => {
     setTeams([]);
     setSittingOut([]);
@@ -704,20 +697,8 @@ export default function VolleyballTeamRandomizer() {
       return;
     }
 
-    try {
-      const response = await fetch(`/api/games?sessionId=${encodeURIComponent(sessionId)}`, {
-        method: 'DELETE'
-      });
-      const data = await response.json().catch(() => ({}));
-      const isReset = response.ok && data.persistence === 'enabled';
-      setPersistenceStatus(isReset ? 'reset' : 'unavailable');
-      
-      if (!isReset) {
-        info('Game history cleared locally');
-      }
-    } catch (error) {
-      info('Game history cleared locally');
-    }
+    const result = await persistDeleteGames(sessionId);
+    setPersistenceStatus(result.persistence);
   };
 
   const renderNames = (playerList) => playerList.map(getPlayerName).join(', ');
