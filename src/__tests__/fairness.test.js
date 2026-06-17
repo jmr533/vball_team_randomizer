@@ -100,8 +100,7 @@ describe('Fairness Algorithm - Helper Functions', () => {
         ],
         sittingOut: [],
         teams: [],
-        courtModes: ['2v2'],
-        playersSnapshot: []
+        courtModes: ['2v2']
       };
 
       const stats = getPlayerRoundStats([game]);
@@ -117,10 +116,7 @@ describe('Fairness Algorithm - Helper Functions', () => {
           { id: '1', name: 'John', preferredModes: ['2v2', '3v3', '4v4'] }
         ],
         teams: [],
-        courtModes: ['2v2'],
-        playersSnapshot: [
-          { id: '1', name: 'John', preferredModes: ['2v2', '3v3', '4v4'] }
-        ]
+        courtModes: ['2v2']
       };
 
       const stats = getPlayerRoundStats([game]);
@@ -138,16 +134,14 @@ describe('Fairness Algorithm - Helper Functions', () => {
           playing: [player1],
           sittingOut: [player2],
           teams: [],
-          courtModes: ['2v2'],
-          playersSnapshot: [player1, player2]
+          courtModes: ['2v2']
         },
         {
           gameNumber: 2,
           playing: [player2],
           sittingOut: [player1],
           teams: [],
-          courtModes: ['2v2'],
-          playersSnapshot: [player1, player2]
+          courtModes: ['2v2']
         }
       ];
 
@@ -167,8 +161,7 @@ describe('Fairness Algorithm - Helper Functions', () => {
         playing: [],
         sittingOut: [ineligiblePlayer],
         teams: [],
-        courtModes: ['2v2'], // Only 2v2 is active
-        playersSnapshot: [eligiblePlayer, ineligiblePlayer]
+        courtModes: ['2v2'] // Only 2v2 is active
       };
 
       const stats = getPlayerRoundStats([game]);
