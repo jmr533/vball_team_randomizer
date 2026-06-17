@@ -15,10 +15,32 @@ This document tracks the implementation of 4 key improvements to the Beach Volle
 
 These are useful improvements to consider after the current implementation, especially given the Vercel free tier and GitHub deployment context.
 
-- **Modular Code Organization**: Break `App.js` into smaller components and hooks to improve maintainability and make future changes safer.
+- **Modular Code Organization**: Break `App.js` into smaller components and hooks to improve maintainability and make future changes safer. ✅ Initial helper extraction completed via `src/gameHelpers.js`.
 - **Accessibility Improvements**: Add ARIA labels, keyboard support for court selection controls, and better contrast for buttons and status text.
 - **Undo Last Game**: Add an undo feature for the most recent generated game to reduce friction during play.
 - **Preferences Persistence**: Save user settings (default court count, default mode, last player list) in local storage for faster reuse.
+
+---
+
+## ✅ Task 0: Modular Code Organization - COMPLETED
+
+### Objectives
+- Move shared game helper functions out of `src/App.js` into a reusable helper module.
+- Preserve existing app behavior and retain full functionality.
+- Keep the refactor isolated to helper extraction, without altering the fairness algorithm or UI logic.
+
+### Implementation Details
+
+**File Created:**
+- `src/gameHelpers.js` - extracted shared constants and helper functions, including game mode utilities, player normalization, eligibility checks, persistence helpers, and round statistics.
+
+**Files Modified:**
+- `src/App.js` - replaced inline helper definitions with imports from `src/gameHelpers.js`.
+
+### Validation
+
+- `npm test -- --watchAll=false` passed successfully.
+- `27/27` tests passing, confirming the refactor preserved behavior.
 
 ---
 
