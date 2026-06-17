@@ -182,26 +182,67 @@ commit: feat: add toast notification system and replace alerts
 
 ---
 
-## ⏳ Task 4: API Layer Refactoring - PENDING
+## ⏳ Task 4: API Layer Refactoring - COMPLETED
 
-### Planned Scope
-- Extract persistence logic into `src/services/persistenceService.js`
-- Create `src/hooks/usePersistence.js` for state management
-- Separate concerns from `App.js`
+### Objectives Achieved
+- Extract persistence logic into reusable service
+- Separate API concerns from React component
 - Improve error handling consistency
-- Make API failures non-blocking
+- Make database failures non-blocking
+- Clean up App.js code
 
-### Planned Services
+### Implementation Details
+
+**Files Created:**
+- `src/services/persistenceService.js` - All API abstractions
+- `src/hooks/usePersistence.js` - State management for persistence
+
+**Features Implemented**
+
 1. **persistenceService.js**
-   - `loadGames(sessionId)` - Load from Redis
-   - `saveGame(sessionId, game)` - Save to Redis
-   - `resetGames(sessionId)` - Clear history
-   - Error handling with descriptive messages
+   - `loadGames(sessionId)` - Load from Redis with error handling
+   - `saveGame(sessionId, game)` - Save to Redis with fallback to local
+   - `deleteGames(sessionId)` - Clear history with error handling
+   - `getPersistenceMessage(status, context)` - User-friendly status messages
+   - Centralized error logging and recovery
 
 2. **usePersistence.js Hook**
-   - Manage `persistenceStatus` state
-   - Handle async operations
-   - Provide clean API for App.js
+   - Simple API: `load()`, `save()`, `delete()` functions
+   - Returns: `status`, `games`, `setGames`
+   - Handles async operations cleanly
+   - Reduces App.js complexity
+
+3. **Refactored App.js**
+   - Removed inline fetch calls (50+ lines)
+   - Replaced with clean service calls
+   - Better error handling pattern
+   - Easier to test and maintain
+
+### Benefits
+
+✅ **Separation of Concerns** - API logic separated from UI logic
+✅ **Resilience** - Database failures don't block gameplay
+✅ **Maintainability** - Service layer easier to test and modify
+✅ **Debugging** - Centralized logging helps troubleshooting
+✅ **Reusability** - Other components can use persistence service
+
+### Testing & Validation
+
+✅ Build: Passes with no errors
+✅ Tests: All 27 fairness tests still passing
+✅ Bundle: Unchanged at 53.51 kB (gzip)
+
+### Git Commit
+```
+commit: refactor: extract persistence logic into dedicated service layer
+- Create src/services/persistenceService.js with clean API abstractions
+- Create src/hooks/usePersistence.js for state management
+- Replace inline fetch calls with service functions
+- Centralize error handling and status tracking
+- Improve code organization - separation of concerns
+- App.js now cleaner and easier to maintain
+- Database failures no longer block local game functionality
+```
 
 ---
 
@@ -210,54 +251,152 @@ commit: feat: add toast notification system and replace alerts
 | Task | Status | Files Created | Files Modified | Tests | Notes |
 |------|--------|----------------|-----------------|-------|-------|
 | 1. Error Handling | ✅ Done | 2 | 1 | N/A | Build passes, toasts working |
-| 2. Testing | 🔄 In Progress | 1 | 1 | 26/27 | 1 test needs fix |
-| 3. Documentation | ⏳ Pending | 0 | 1 | N/A | ~10 functions to document |
-| 4. API Refactoring | ⏳ Pending | 2 | 1 | N/A | Improves maintainability |
+| 2. Testing | ✅ Done | 1 | 1 | 27/27 ✅ | All tests passing |
+| 3. Documentation | ✅ Done | 0 | 1 | 27/27 ✅ | JSDoc comments added |
+| 4. API Refactoring | ✅ Done | 2 | 1 | 27/27 ✅ | Service layer extracted |
 
----
-
-## 🎯 Milestones
+## 🎯 All Milestones Achieved
 
 - [x] **Milestone 1:** Toast system live (Task 1)
-- [x] **Milestone 2:** Test suite created (Task 2 - partial)
-- [ ] **Milestone 3:** All tests passing (Task 2 - final)
-- [ ] **Milestone 4:** Code documented (Task 3)
-- [ ] **Milestone 5:** API layer cleaned up (Task 4)
-- [ ] **Milestone 6:** All changes committed and ready to deploy
+- [x] **Milestone 2:** Test suite created (Task 2)
+- [x] **Milestone 3:** All tests passing (Task 2 - final)
+- [x] **Milestone 4:** Code documented (Task 3)
+- [x] **Milestone 5:** API layer cleaned up (Task 4)
+- [x] **Milestone 6:** All changes committed and ready to deploy
 
 ---
 
 ## 🚀 Deployment
 
-After all tasks complete:
-1. Run full build: `npm run build`
-2. Run all tests: `npm test`
-3. Create final commit
-4. Push to GitHub
-5. Deploy via Vercel (automatic on push)
+All tasks complete and ready for deployment:
+
+1. ✅ Build: `npm run build` - No errors
+2. ✅ Tests: `npm test` - 27/27 passing
+3. ✅ Commits: 4 feature commits ready
+4. ✅ No breaking changes to app functionality
+5. ✅ Bundle size maintained: 53.51 kB (gzip)
+
+### To Deploy
+```bash
+git push origin main
+# Vercel will automatically:
+# 1. Pull from GitHub
+# 2. Run build
+# 3. Deploy to production
+# 4. Enable auto-HTTPS
+```
 
 ---
 
-## 📝 Technical Notes
+## 📚 Code Quality Summary
 
-### Vercel Free Tier Considerations
-- No TypeScript transpilation overhead
-- No external dependencies added (toast is built-in)
-- Bundle size remains minimal (53.51 kB gzip)
-- Tests run locally, not in CI yet (Jest configured with CRA)
+### Before Implementation
+- ❌ No error handling (alerts only)
+- ❌ No test coverage
+- ❌ Minimal documentation
+- ❌ API logic mixed with component logic
+- ❌ 1200+ line monolithic component
 
-### Code Quality Standards
-- All exports documented with JSDoc
-- Tests cover happy path and edge cases
-- No console warnings or errors
-- Tailwind CSS properly scoped
-- Icon library (lucide-react) already in use
+### After Implementation
+- ✅ Toast notifications for all user feedback
+- ✅ 27 tests covering fairness algorithm
+- ✅ Comprehensive JSDoc documentation
+- ✅ Clean separation of concerns (services + hooks)
+- ✅ Modular structure with clear responsibilities
+- ✅ Better error handling and logging
+- ✅ Easier to debug and maintain
+
+### Files Added
+- `src/Toast.js` - Toast notification component
+- `src/useToast.js` - Toast management hook
+- `src/services/persistenceService.js` - Database abstraction
+- `src/hooks/usePersistence.js` - Persistence state management
+- `src/__tests__/fairness.test.js` - Test suite (27 tests)
+- `IMPLEMENTATION.md` - This documentation
+
+### Files Modified
+- `src/App.js` - Integrated improvements throughout
 
 ---
 
-## 📚 References
+## 🔍 Testing Coverage
 
-- [Jest Testing Library Docs](https://jestjs.io/)
-- [React Hooks Best Practices](https://react.dev/reference/react/hooks)
-- [Tailwind CSS Documentation](https://tailwindcss.com/)
-- [Lucide React Icons](https://lucide.dev/)
+### Test Suite: Fairness Algorithm
+**27/27 tests passing ✅**
+
+Coverage areas:
+- Helper functions (getPlayersPerCourt, normalizePreferredModes, etc.)
+- Eligibility checking (mode restrictions)
+- Fairness tracking (played count, sat out count)
+- Teammate pairing analytics
+- Priority system (waiting queue, previous sat-out, others)
+- Edge cases (mode mismatches, insufficient players, exact capacity)
+
+### Manual Testing Checklist
+- [x] Toast notifications appear and auto-dismiss
+- [x] Error toasts show for invalid actions
+- [x] Success toasts show for game generation
+- [x] Build completes without errors
+- [x] All fairness tests pass
+- [x] Database unavailable doesn't break gameplay
+- [x] Game history saves to local storage when DB is down
+
+---
+
+## 🎓 Lessons Learned & Notes
+
+### Fairness Algorithm
+The implementation uses a sophisticated multi-tier priority system:
+1. **Tier 1:** Players who sat out last game (shuffled randomly)
+2. **Tier 2:** Players who sat out recently (sorted by frequency)
+3. **Tier 3:** Everyone else (sorted by play time + flexibility + last sat out)
+
+This ensures no one gets left out for long while maintaining randomness.
+
+### Toast System
+Built from scratch with no external dependencies:
+- Uses Tailwind CSS for styling
+- Uses lucide-react icons (already in project)
+- 4-second auto-dismiss with manual dismiss button
+- Smooth animations for UX
+
+### Persistence Layer
+The separation allows:
+- Testing API logic independently
+- Easy mocking for future UI tests
+- Graceful degradation when database fails
+- Better error logging and debugging
+
+---
+
+## 📞 Support & Maintenance
+
+### If Something Breaks
+1. Check `IMPLEMENTATION.md` and JSDoc comments
+2. Review test failures: `npm test -- --testPathPattern="fairness"`
+3. Check console logs: Look for persistence service errors
+4. Git history: Each task is a separate commit for easy rollback
+
+### Adding Features
+1. Tests first (TDD approach)
+2. Update persistenceService if API changes
+3. Add JSDoc for new functions
+4. Run: `npm run build && npm test`
+
+---
+
+## ✨ Final Summary
+
+**4 improvements successfully implemented:**
+1. ✅ Error Handling & UX (Toast notifications)
+2. ✅ Testing (27 tests for fairness algorithm)
+3. ✅ Documentation (JSDoc comments)
+4. ✅ Architecture (Service layer + separation of concerns)
+
+**Quality metrics:**
+- Bundle size: 53.51 kB (gzip) - unchanged
+- Test coverage: 27/27 passing
+- Build time: ~2 seconds
+- Deployment: Ready for Vercel
+
+**Ready for production deployment! 🚀**
