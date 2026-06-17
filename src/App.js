@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Shuffle, Users, Plus, Minus, Trash2, RotateCcw } from 'lucide-react';
 import { ToastContainer } from './Toast';
 import { useToast } from './useToast';
-import { usePersistence } from './hooks/usePersistence';
 import { saveGame as persistSaveGame, deleteGames as persistDeleteGames } from './services/persistenceService';
 import {
   GAME_MODES,
@@ -68,7 +67,6 @@ export default function VolleyballTeamRandomizer() {
   const inputRefs = useRef([]);
   const [shouldFocusLast, setShouldFocusLast] = useState(false);
   const { toasts, dismiss, success, error, info } = useToast();
-  const { status: persistenceApiStatus, load: loadGamesFromDb } = usePersistence();
 
   const validPlayers = useMemo(
     () => players.filter((player) => getPlayerName(player) !== ''),
