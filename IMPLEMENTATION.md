@@ -11,6 +11,17 @@ This document tracks the implementation of 4 key improvements to the Beach Volle
 
 ---
 
+## 🔧 Future Enhancements (Medium Value)
+
+These are useful improvements to consider after the current implementation, especially given the Vercel free tier and GitHub deployment context.
+
+- **Modular Code Organization**: Break `App.js` into smaller components and hooks to improve maintainability and make future changes safer.
+- **Accessibility Improvements**: Add ARIA labels, keyboard support for court selection controls, and better contrast for buttons and status text.
+- **Undo Last Game**: Add an undo feature for the most recent generated game to reduce friction during play.
+- **Preferences Persistence**: Save user settings (default court count, default mode, last player list) in local storage for faster reuse.
+
+---
+
 ## ✅ Task 1: Error Handling & UX - COMPLETED
 
 ### Objectives
