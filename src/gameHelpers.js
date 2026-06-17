@@ -120,7 +120,7 @@ const getPlayerRoundStats = (games) => {
   const statsByPlayerId = new Map();
 
   games.forEach((game) => {
-    const gameModes = game.courtModes || (game.teams || []).map((court) => court.gameMode || game.gameMode || '2v2');
+    const gameModes = game.courtModes || [];
 
     (game.playing || []).forEach((player) => {
       const stats = statsByPlayerId.get(player.id) || { played: 0, satOut: 0, lastSatOutGame: 0 };
