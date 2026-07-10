@@ -13,6 +13,7 @@ import {
   normalizePreferredModes,
   createPlayer,
   isPlayerEligibleForMode,
+  canPlayerPlaySelectedModes,
   hasAnyModePreference,
   getPreferenceLabel,
   getTeamGroupStats,
@@ -97,6 +98,12 @@ export default function VolleyballTeamRandomizer() {
   const waitingQueue = teams.length === 0 && gameHistory.length > 0
     ? gameHistory[gameHistory.length - 1].sittingOut || []
     : [];
+  const guaranteedWaitingPlayers = waitingQueue.filter((player) =>
+    canPlayerPlaySelectedModes(player, activeCourtModes)
+  );
+  const ineligibleWaitingPlayers = waitingQueue.filter((player) =>
+    !canPlayerPlaySelectedModes(player, activeCourtModes)
+  );
 
   const addPlayer = () => {
     setPlayers((currentPlayers) => [...currentPlayers, createPlayer()]);
@@ -511,11 +518,11 @@ export default function VolleyballTeamRandomizer() {
           )}
         </div>
 
-        {waitingQueue.length > 0 && teams.length === 0 && (
+        {guaranteedWaitingPlayers.length > 0 && teams.length === 0 && (
           <div className="mb-8 rounded-lg border-2 border-blue-300 bg-blue-100 p-4">
             <h3 className="mb-2 font-bold text-blue-800">Guaranteed Next Game</h3>
             <div className="flex flex-wrap gap-2">
-              {waitingQueue.map((player) => (
+              {guaranteedWaitingPlayers.map((player) => (
                 <span key={player.id} className="rounded-full bg-blue-200 px-3 py-1 font-medium text-blue-800">
                   {getPlayerName(player)}
                 </span>
@@ -523,6 +530,22 @@ export default function VolleyballTeamRandomizer() {
             </div>
             <p className="mt-2 text-sm text-blue-700">
               These players sat out last game and will be prioritized for the next game.
+            </p>
+          </div>
+        )}
+
+        {ineligibleWaitingPlayers.length > 0 && teams.length === 0 && (
+          <div className="mb-8 rounded-lg border-2 border-red-300 bg-red-100 p-4">
+            <h3 className="mb-2 font-bold text-red-800">Preferences Prevent Next-Game Priority</h3>
+            <div className="flex flex-wrap gap-2">
+              {ineligibleWaitingPlayers.map((player) => (
+                <span key={player.id} className="rounded-full bg-red-200 px-3 py-1 font-medium text-red-800">
+                  {getPlayerName(player)} ({getPreferenceLabel(player)})
+                </span>
+              ))}
+            </div>
+            <p className="mt-2 text-sm text-red-700">
+              None of the selected court modes match these players. Change a court mode or their preferences before generating.
             </p>
           </div>
         )}
@@ -589,7 +612,11 @@ export default function VolleyballTeamRandomizer() {
                   ))}
                 </div>
                 <p className="mt-2 text-sm text-yellow-700">
-                  <strong>Guaranteed to play next game.</strong> They'll be prioritized when you generate the next round.
+                  {sittingOut.every((player) => canPlayerPlaySelectedModes(player, activeCourtModes)) ? (
+                    <><strong>Guaranteed to play next game.</strong> They'll be prioritized when you generate the next round.</>
+                  ) : (
+                    <><strong>Preference check needed.</strong> A player is only guaranteed a spot when a selected court mode matches their preferences.</>
+                  )}
                 </p>
               </div>
             )}

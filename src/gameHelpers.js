@@ -54,6 +54,10 @@ const isPlayerEligibleForMode = (player, mode) => {
   return normalizePreferredModes(player.preferredModes).includes(mode);
 };
 
+const canPlayerPlaySelectedModes = (player, modes) => {
+  return modes.some((mode) => isPlayerEligibleForMode(player, mode));
+};
+
 const hasAnyModePreference = (player) => {
   return normalizePreferredModes(player.preferredModes).length === GAME_MODES.length;
 };
@@ -156,6 +160,7 @@ export {
   normalizePreferredModes,
   createPlayer,
   isPlayerEligibleForMode,
+  canPlayerPlaySelectedModes,
   hasAnyModePreference,
   getPreferenceLabel,
   getTeamGroupStats,
