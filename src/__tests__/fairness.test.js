@@ -7,6 +7,7 @@ import {
   getPlayersPerCourt,
   normalizePreferredModes,
   isPlayerEligibleForMode,
+  canPlayerPlaySelectedModes,
   getPlayerRoundStats,
   getTeamGroupStats
 } from '../gameHelpers';
@@ -82,6 +83,15 @@ describe('Fairness Algorithm - Helper Functions', () => {
       };
       expect(isPlayerEligibleForMode(player, '3v3')).toBe(false);
       expect(isPlayerEligibleForMode(player, '4v4')).toBe(false);
+    });
+  });
+
+  describe('canPlayerPlaySelectedModes', () => {
+    const player = { id: '1', name: 'John', preferredModes: ['3v3'] };
+
+    it('only guarantees a waiting player when a selected mode matches', () => {
+      expect(canPlayerPlaySelectedModes(player, ['2v2'])).toBe(false);
+      expect(canPlayerPlaySelectedModes(player, ['2v2', '3v3'])).toBe(true);
     });
   });
 
