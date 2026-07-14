@@ -53,7 +53,7 @@ export function Toast({ id, message, type = 'info', onDismiss }) {
       }`}
     >
       <div
-        className={`flex items-start gap-3 rounded-lg border ${typeConfig.bg} ${typeConfig.border} p-4 shadow-lg`}
+        className={`flex items-start gap-3 rounded-2xl border ${typeConfig.bg} ${typeConfig.border} p-4 shadow-xl backdrop-blur`}
       >
         <IconComponent className={`h-5 w-5 flex-shrink-0 ${typeConfig.iconColor}`} />
         <p className={`flex-1 ${typeConfig.text} text-sm font-medium`}>{message}</p>
