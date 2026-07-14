@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Shuffle, Users, Plus, Minus, Trash2, RotateCcw } from 'lucide-react';
+import { Shuffle, Users, Plus, Minus, Trash2, RotateCcw, Waves, Sun, Trophy, MapPin } from 'lucide-react';
 import { ToastContainer } from './Toast';
 import { useToast } from './useToast';
 import {
@@ -370,32 +370,53 @@ export default function VolleyballTeamRandomizer() {
     .join(' | ');
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-amber-50 p-4 sm:p-6">
-      <div className="mx-auto max-w-4xl rounded-lg bg-white p-5 shadow-lg sm:p-8">
-        <div className="mb-8 text-center">
-          <h1 className="mb-2 flex items-center justify-center gap-2 text-3xl font-bold text-blue-900">
-            <Users className="h-8 w-8" />
-            Beach Volleyball Team Randomizer
-          </h1>
-          <p className="text-gray-600">Fair and random team selection across up to {MAX_COURTS} courts</p>
+    <div className="beach-app min-h-screen p-3 sm:p-6 lg:p-10">
+      <div className="beach-orb beach-orb-one" aria-hidden="true" />
+      <div className="beach-orb beach-orb-two" aria-hidden="true" />
+      <main className="relative mx-auto max-w-5xl overflow-hidden rounded-[2rem] border border-white/70 bg-white/90 shadow-2xl shadow-sky-950/15 backdrop-blur-xl">
+        <header className="hero-panel relative overflow-hidden px-5 py-10 text-white sm:px-10 sm:py-14">
+          <div className="relative z-10 max-w-2xl">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/15 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.2em] backdrop-blur">
+              <Sun className="h-4 w-4 text-amber-200" /> Game day, simplified
+            </div>
+            <h1 className="font-display text-4xl font-black leading-[0.95] tracking-tight sm:text-6xl">
+              Rally. Rotate.<br /><span className="text-amber-200">Play fair.</span>
+            </h1>
+            <p className="mt-5 max-w-xl text-base leading-relaxed text-sky-50 sm:text-lg">Beautifully balanced beach volleyball teams, ready in a single tap.</p>
+            <div className="mt-7 flex flex-wrap gap-3 text-sm font-semibold">
+              <span className="hero-stat"><MapPin className="h-4 w-4" /> {courts} {courts === 1 ? 'court' : 'courts'}</span>
+              <span className="hero-stat"><Users className="h-4 w-4" /> {totalPlayers} players</span>
+              <span className="hero-stat"><Trophy className="h-4 w-4" /> {gameHistory.length} rounds</span>
+            </div>
+          </div>
+          <div className="volleyball-mark" aria-hidden="true"><span /></div>
+          <Waves className="absolute -bottom-9 left-0 h-24 w-full text-white/15" strokeWidth={1} aria-hidden="true" />
+        </header>
+
+        <div className="p-5 sm:p-8 lg:p-10">
+        <div className="mb-10">
+          <div className="section-heading">
+            <span className="section-number">01</span>
+            <div><h2>Set your courts</h2><p>Choose how many games run at once and the format for each.</p></div>
+          </div>
         </div>
 
         <div className="mb-8">
           <h2 className="mb-4 text-xl font-semibold text-gray-800">Courts</h2>
-          <div className="mb-5 flex items-center gap-4">
+          <div className="mb-6 flex items-center gap-3 rounded-2xl bg-sky-50 p-2 w-fit">
             <button
               onClick={() => updateCourts(courts - 1)}
               disabled={courts <= 1}
-              className="rounded-lg bg-gray-500 px-3 py-2 text-white hover:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
+              className="round-control"
               aria-label="Remove court"
             >
               <Minus className="h-4 w-4" />
             </button>
-            <span className="min-w-[3rem] text-center text-2xl font-bold text-blue-900">{courts}</span>
+            <span className="min-w-[3rem] text-center text-2xl font-black text-sky-950">{courts}</span>
             <button
               onClick={() => updateCourts(courts + 1)}
               disabled={courts >= MAX_COURTS}
-              className="rounded-lg bg-gray-500 px-3 py-2 text-white hover:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
+              className="round-control"
               aria-label="Add court"
             >
               <Plus className="h-4 w-4" />
@@ -404,10 +425,10 @@ export default function VolleyballTeamRandomizer() {
 
           <div className="grid gap-4 md:grid-cols-2">
             {activeCourtModes.map((mode, courtIndex) => (
-              <div key={courtIndex} className="rounded-lg border border-blue-100 bg-blue-50 p-4">
+              <div key={courtIndex} className="court-config-card">
                 <div className="mb-3 flex items-center justify-between gap-3">
-                  <h3 className="font-semibold text-blue-900">Court {courtIndex + 1}</h3>
-                  <span className="text-xs font-medium text-blue-700">{getPlayersPerCourt(mode)} players</span>
+                  <h3 className="font-display text-lg font-black text-sky-950">Court {courtIndex + 1}</h3>
+                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-sky-700 shadow-sm">{getPlayersPerCourt(mode)} players</span>
                 </div>
                 <div className="flex gap-2">
                   {GAME_MODES.map((availableMode) => (
@@ -416,8 +437,8 @@ export default function VolleyballTeamRandomizer() {
                       onClick={() => handleCourtModeChange(courtIndex, availableMode)}
                       className={`flex-1 rounded-lg px-3 py-2 font-medium transition-colors ${
                         mode === availableMode
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-100'
+                          ? 'bg-sky-700 text-white shadow-md shadow-sky-900/20'
+                          : 'bg-white/80 text-slate-600 ring-1 ring-sky-100 hover:bg-white hover:text-sky-800'
                       }`}
                     >
                       {availableMode}
@@ -436,11 +457,14 @@ export default function VolleyballTeamRandomizer() {
           )}
         </div>
 
-        <div className="mb-8">
-          <h2 className="mb-4 text-xl font-semibold text-gray-800">Add Players</h2>
+        <div className="mb-10">
+          <div className="section-heading">
+            <span className="section-number">02</span>
+            <div><h2>Build your lineup</h2><p>Add everyone playing and tap their preferred formats.</p></div>
+          </div>
           <div className="space-y-3">
             {players.map((player, index) => (
-              <div key={player.id} className="flex flex-col gap-2 rounded-lg border border-gray-100 bg-gray-50 p-3 sm:flex-row sm:items-center">
+              <div key={player.id} className="player-row flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
                 <input
                   ref={(el) => {
                     inputRefs.current[index] = el;
@@ -450,7 +474,7 @@ export default function VolleyballTeamRandomizer() {
                   value={player.name}
                   onChange={(e) => updatePlayer(index, e.target.value)}
                   onKeyDown={(e) => handlePlayerKeyDown(e, index)}
-                  className="min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                  className="player-input min-w-0 flex-1"
                 />
                 <div className="flex flex-wrap gap-1 sm:flex-nowrap" aria-label={`Player ${index + 1} mode preferences`}>
                   {[ALL_MODE_PREFERENCE, ...GAME_MODES].map((preference) => {
@@ -465,8 +489,8 @@ export default function VolleyballTeamRandomizer() {
                         onClick={() => updatePlayerPreferredModes(index, preference)}
                         className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
                           isSelected
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-100'
+                            ? 'bg-sky-700 text-white shadow-sm'
+                            : 'bg-white text-slate-500 ring-1 ring-slate-200 hover:text-sky-700'
                         }`}
                         aria-pressed={isSelected}
                         title={`${getPlayerName(player) || `Player ${index + 1}`} preferences: ${getPreferenceLabel(player)}`}
@@ -479,7 +503,7 @@ export default function VolleyballTeamRandomizer() {
                 {players.length > 1 && (
                   <button
                     onClick={() => removePlayer(index)}
-                    className="self-start rounded-lg bg-red-500 px-3 py-2 text-white transition-colors hover:bg-red-600 sm:self-auto"
+                    className="self-start rounded-xl bg-rose-50 px-3 py-2 text-rose-500 transition-colors hover:bg-rose-500 hover:text-white sm:self-auto"
                     aria-label={`Remove player ${index + 1}`}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -490,7 +514,7 @@ export default function VolleyballTeamRandomizer() {
           </div>
           <button
             onClick={addPlayer}
-            className="mt-3 flex items-center gap-2 rounded-lg bg-green-500 px-4 py-2 text-white transition-colors hover:bg-green-600"
+            className="mt-4 flex items-center gap-2 rounded-xl border border-dashed border-sky-300 bg-sky-50 px-4 py-2.5 font-bold text-sky-700 transition hover:border-sky-500 hover:bg-sky-100"
           >
             <Plus className="h-4 w-4" />
             Add Player
@@ -498,11 +522,11 @@ export default function VolleyballTeamRandomizer() {
           <p className="mt-2 text-sm text-gray-500">Total players: {totalPlayers}</p>
         </div>
 
-        <div className="mb-8 flex gap-4">
+        <div className="action-dock mb-10 flex flex-col gap-3 rounded-2xl p-3 sm:flex-row">
           <button
             onClick={generateTeams}
             disabled={!canGenerateTeams}
-            className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-lg font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="generate-button flex flex-1 items-center justify-center gap-2 rounded-xl px-6 py-4 text-lg font-black text-white disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Shuffle className="h-5 w-5" />
             {gameHistory.length === 0 ? 'Generate Random Teams' : `Generate Game ${gameHistory.length + 1}`}
@@ -510,7 +534,7 @@ export default function VolleyballTeamRandomizer() {
           {gameHistory.length > 0 && (
             <button
               onClick={reset}
-              className="flex items-center gap-2 rounded-lg bg-gray-500 px-6 py-3 text-white transition-colors hover:bg-gray-600"
+              className="flex items-center justify-center gap-2 rounded-xl bg-white px-6 py-3 font-bold text-slate-600 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50"
             >
               <RotateCcw className="h-5 w-5" />
               Reset All
@@ -565,15 +589,15 @@ export default function VolleyballTeamRandomizer() {
 
         {teams.length > 0 && (
           <div className="space-y-6">
-            <h2 className="mb-6 text-center text-2xl font-bold text-green-700">
-              Game {gameHistory.length} Teams
+            <h2 className="font-display mb-6 text-center text-3xl font-black text-sky-950">
+              Game {gameHistory.length} <span className="text-coral">matchups</span>
             </h2>
 
             <div className="grid gap-6 md:grid-cols-2">
               {teams.map((court) => (
-                <div key={court.court} className="rounded-lg border-2 border-blue-300 bg-gradient-to-br from-blue-100 to-blue-200 p-6">
+                <div key={court.court} className="match-card p-5 sm:p-6">
                   <h3 className="mb-4 text-center text-xl font-bold text-blue-800">
-                    Court {court.court} <span className="text-base font-semibold text-blue-600">({court.gameMode || '2v2'})</span>
+                    Court {court.court} <span className="text-base font-semibold text-sky-600">· {court.gameMode || '2v2'}</span>
                   </h3>
 
                   <div className="space-y-4">
@@ -586,7 +610,7 @@ export default function VolleyballTeamRandomizer() {
                       </div>
                     </div>
 
-                    <div className="text-center text-2xl font-bold text-blue-600">VS</div>
+                    <div className="vs-badge">VS</div>
 
                     <div className="rounded-lg bg-white p-4 shadow-sm">
                       <h4 className="mb-2 font-semibold text-blue-700">Team B</h4>
@@ -689,7 +713,8 @@ export default function VolleyballTeamRandomizer() {
             )}
           </div>
         )}
-      </div>
+        </div>
+      </main>
       <ToastContainer toasts={toasts} onDismiss={dismiss} />
     </div>
   );
