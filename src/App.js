@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Shuffle, Users, Plus, Minus, Trash2, RotateCcw, Waves, Sun, Trophy, MapPin } from 'lucide-react';
+import { Shuffle, Users, Plus, Minus, Trash2, RotateCcw, Waves, Sun, Moon, Monitor, Trophy, MapPin } from 'lucide-react';
 import { ToastContainer } from './Toast';
 import { useToast } from './useToast';
 import {
@@ -7,6 +7,8 @@ import {
   createRoundResetSession,
   sessionStore
 } from './sessionPersistence';
+import { applyTheme, resolveTheme, THEME_OPTIONS } from './theme';
+import { applyNativeTheme } from './nativeTheme';
 import {
   GAME_MODES,
   MAX_COURTS,
@@ -61,6 +63,7 @@ export default function VolleyballTeamRandomizer() {
   const [teams, setTeams] = useState([]);
   const [sittingOut, setSittingOut] = useState([]);
   const [gameHistory, setGameHistory] = useState([]);
+  const [theme, setTheme] = useState('system');
   const [isHydrated, setIsHydrated] = useState(false);
   const [isStartOverOpen, setIsStartOverOpen] = useState(false);
   const inputRefs = useRef([]);
@@ -83,6 +86,7 @@ export default function VolleyballTeamRandomizer() {
         setTeams(storedSession.teams);
         setSittingOut(storedSession.sittingOut);
         setGameHistory(storedSession.gameHistory);
+        setTheme(storedSession.theme);
       })
       .catch(() => {
         if (isMounted) {
@@ -106,14 +110,35 @@ export default function VolleyballTeamRandomizer() {
       return;
     }
 
-    sessionStore.save({ players, courts, courtModes, teams, sittingOut, gameHistory })
+    sessionStore.save({ players, courts, courtModes, teams, sittingOut, gameHistory, theme })
       .catch(() => {
         if (!storageErrorShownRef.current) {
           storageErrorShownRef.current = true;
           error('Changes could not be saved on this device.');
         }
       });
-  }, [players, courts, courtModes, teams, sittingOut, gameHistory, isHydrated, error]);
+  }, [players, courts, courtModes, teams, sittingOut, gameHistory, theme, isHydrated, error]);
+
+  useEffect(() => {
+    const colorSchemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const syncTheme = () => {
+      const resolvedTheme = resolveTheme(theme, window.matchMedia);
+      applyTheme(resolvedTheme);
+      applyNativeTheme(resolvedTheme).catch(() => undefined);
+
+      const themeColor = document.querySelector('meta[name="theme-color"]');
+      themeColor?.setAttribute('content', resolvedTheme === 'dark' ? '#071827' : '#075985');
+    };
+
+    syncTheme();
+
+    if (theme !== 'system') {
+      return undefined;
+    }
+
+    colorSchemeQuery.addEventListener('change', syncTheme);
+    return () => colorSchemeQuery.removeEventListener('change', syncTheme);
+  }, [theme]);
 
   useEffect(() => {
     if (!isStartOverOpen) {
@@ -422,7 +447,7 @@ export default function VolleyballTeamRandomizer() {
   };
 
   const reset = () => {
-    const resetSession = createRoundResetSession({ players, courts, courtModes });
+    const resetSession = createRoundResetSession({ players, courts, courtModes, theme });
     setTeams(resetSession.teams);
     setSittingOut(resetSession.sittingOut);
     setGameHistory(resetSession.gameHistory);
@@ -444,6 +469,7 @@ export default function VolleyballTeamRandomizer() {
     setTeams(initialSession.teams);
     setSittingOut(initialSession.sittingOut);
     setGameHistory(initialSession.gameHistory);
+    setTheme(initialSession.theme);
     setShouldFocusLast(false);
     setIsStartOverOpen(false);
     success('Started a new session.');
@@ -464,8 +490,28 @@ export default function VolleyballTeamRandomizer() {
     <div className="beach-app min-h-screen p-3 sm:p-6 lg:p-10">
       <div className="beach-orb beach-orb-one" aria-hidden="true" />
       <div className="beach-orb beach-orb-two" aria-hidden="true" />
-      <main aria-busy={!isHydrated} className="relative mx-auto max-w-5xl overflow-hidden rounded-[2rem] border border-white/70 bg-white/90 shadow-2xl shadow-sky-950/15 backdrop-blur-xl">
+      <main aria-busy={!isHydrated} className="app-shell relative mx-auto max-w-5xl overflow-hidden rounded-[2rem] border border-white/70 bg-white/90 shadow-2xl shadow-sky-950/15 backdrop-blur-xl">
         <header className="hero-panel relative overflow-hidden px-5 py-10 text-white sm:px-10 sm:py-14">
+          <div className="theme-switcher" role="group" aria-label="Color theme">
+            {THEME_OPTIONS.map((themeOption) => {
+              const ThemeIcon = themeOption === 'light' ? Sun : themeOption === 'dark' ? Moon : Monitor;
+
+              return (
+                <button
+                  key={themeOption}
+                  type="button"
+                  className="theme-option"
+                  aria-label={`Use ${themeOption} theme`}
+                  aria-pressed={theme === themeOption}
+                  title={`${themeOption[0].toUpperCase()}${themeOption.slice(1)} theme`}
+                  onClick={() => setTheme(themeOption)}
+                >
+                  <ThemeIcon className="h-4 w-4" />
+                  <span>{themeOption}</span>
+                </button>
+              );
+            })}
+          </div>
           <div className="relative z-10 max-w-2xl">
             <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/15 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.2em] backdrop-blur">
               <Sun className="h-4 w-4 text-amber-200" /> Game day, simplified

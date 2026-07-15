@@ -102,8 +102,9 @@ npm run android:assets
 ### Local session behavior
 
 - Players, courts, modes, current teams, sitting-out players, and round history survive an app restart.
+- Appearance can be set to **Light**, **Dark**, or **System** and is restored on restart.
 - **Reset All** clears matchups and round history while keeping the roster and court setup.
-- **Start Over** asks for confirmation, then clears all saved session data.
+- **Start Over** asks for confirmation, then clears all saved session data and returns the theme to **System**.
 - The application assets and fonts are bundled, so team generation works offline.
 
 ## Test
