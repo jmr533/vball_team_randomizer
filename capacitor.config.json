@@ -1,0 +1,8 @@
+{
+  "appId": "com.vballteamrandomizer.app",
+  "appName": "Beach Volleyball Team Randomizer",
+  "webDir": "build",
+  "android": {
+    "backgroundColor": "#dff6f5"
+  }
+}

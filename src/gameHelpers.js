@@ -35,8 +35,8 @@ const normalizePreferredModes = (preferredModes) => {
 const normalizePlayer = (player) => {
   if (player && typeof player === 'object') {
     return {
-      id: player.id || createId('player'),
-      name: player.name || '',
+      id: typeof player.id === 'string' && player.id ? player.id : createId('player'),
+      name: typeof player.name === 'string' ? player.name : '',
       preferredModes: normalizePreferredModes(player.preferredModes)
     };
   }
@@ -158,6 +158,7 @@ export {
   getGameModeDescription,
   getPlayerName,
   normalizePreferredModes,
+  normalizePlayer,
   createPlayer,
   isPlayerEligibleForMode,
   canPlayerPlaySelectedModes,
