@@ -793,11 +793,11 @@ export default function VolleyballTeamRandomizer() {
         )}
 
         {gameHistory.length > 0 && (
-          <div className="mt-8 rounded-lg bg-gray-50 p-6">
+          <div className="game-history-panel mt-8 rounded-lg bg-gray-50 p-6">
             <h3 className="mb-4 text-lg font-bold text-gray-800">Game History</h3>
             <div className="space-y-3">
               {gameHistory.map((game) => (
-                <div key={`${game.gameNumber}-${game.createdAt || ''}`} className="rounded border bg-white p-4">
+                <div key={`${game.gameNumber}-${game.createdAt || ''}`} className="history-game-card rounded border bg-white p-4">
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <span className="font-semibold text-gray-700">Game {game.gameNumber}</span>
                     <span className="text-sm text-gray-500">
@@ -840,11 +840,11 @@ export default function VolleyballTeamRandomizer() {
             </div>
 
             {teamGroupStats.length > 0 && (
-              <div className="mt-6 rounded border bg-white p-4">
+              <div className="history-summary-card mt-6 rounded border bg-white p-4">
                 <h4 className="mb-3 font-semibold text-gray-800">{teamGroupHistoryTitle}</h4>
                 <div className="grid gap-2 text-sm sm:grid-cols-2">
                   {teamGroupStats.map((teamGroup) => (
-                    <div key={teamGroup.key} className="flex items-center justify-between gap-3 rounded bg-blue-50 px-3 py-2">
+                    <div key={teamGroup.key} className="history-pair-row flex items-center justify-between gap-3 rounded bg-blue-50 px-3 py-2">
                       <span className="font-medium text-blue-900">
                         {renderTeamGroup(teamGroup.players)}
                       </span>
