@@ -3,6 +3,11 @@ import { Shuffle, Users, Plus, Minus, Trash2, RotateCcw, Waves, Sun, Trophy, Map
 import { ToastContainer } from './Toast';
 import { useToast } from './useToast';
 import {
+  createInitialSession,
+  createRoundResetSession,
+  sessionStore
+} from './sessionPersistence';
+import {
   GAME_MODES,
   MAX_COURTS,
   DEFAULT_COURT_MODES,
@@ -56,9 +61,74 @@ export default function VolleyballTeamRandomizer() {
   const [teams, setTeams] = useState([]);
   const [sittingOut, setSittingOut] = useState([]);
   const [gameHistory, setGameHistory] = useState([]);
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [isStartOverOpen, setIsStartOverOpen] = useState(false);
   const inputRefs = useRef([]);
+  const storageErrorShownRef = useRef(false);
   const [shouldFocusLast, setShouldFocusLast] = useState(false);
   const { toasts, dismiss, success, error } = useToast();
+
+  useEffect(() => {
+    let isMounted = true;
+
+    sessionStore.load()
+      .then((storedSession) => {
+        if (!isMounted || !storedSession) {
+          return;
+        }
+
+        setPlayers(storedSession.players);
+        setCourts(storedSession.courts);
+        setCourtModes(storedSession.courtModes);
+        setTeams(storedSession.teams);
+        setSittingOut(storedSession.sittingOut);
+        setGameHistory(storedSession.gameHistory);
+      })
+      .catch(() => {
+        if (isMounted) {
+          storageErrorShownRef.current = true;
+          error('Saved session could not be restored. Starting fresh.');
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsHydrated(true);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [error]);
+
+  useEffect(() => {
+    if (!isHydrated) {
+      return;
+    }
+
+    sessionStore.save({ players, courts, courtModes, teams, sittingOut, gameHistory })
+      .catch(() => {
+        if (!storageErrorShownRef.current) {
+          storageErrorShownRef.current = true;
+          error('Changes could not be saved on this device.');
+        }
+      });
+  }, [players, courts, courtModes, teams, sittingOut, gameHistory, isHydrated, error]);
+
+  useEffect(() => {
+    if (!isStartOverOpen) {
+      return undefined;
+    }
+
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') {
+        setIsStartOverOpen(false);
+      }
+    };
+
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [isStartOverOpen]);
 
   const validPlayers = useMemo(
     () => players.filter((player) => getPlayerName(player) !== ''),
@@ -352,10 +422,31 @@ export default function VolleyballTeamRandomizer() {
   };
 
   const reset = () => {
-    setTeams([]);
-    setSittingOut([]);
-    setGameHistory([]);
+    const resetSession = createRoundResetSession({ players, courts, courtModes });
+    setTeams(resetSession.teams);
+    setSittingOut(resetSession.sittingOut);
+    setGameHistory(resetSession.gameHistory);
     success('All games reset successfully!');
+  };
+
+  const startOver = () => {
+    const initialSession = createInitialSession();
+
+    sessionStore.clear().catch(() => {
+      if (!storageErrorShownRef.current) {
+        storageErrorShownRef.current = true;
+        error('Saved session could not be cleared from this device.');
+      }
+    });
+    setPlayers(initialSession.players);
+    setCourts(initialSession.courts);
+    setCourtModes(initialSession.courtModes);
+    setTeams(initialSession.teams);
+    setSittingOut(initialSession.sittingOut);
+    setGameHistory(initialSession.gameHistory);
+    setShouldFocusLast(false);
+    setIsStartOverOpen(false);
+    success('Started a new session.');
   };
 
   const renderNames = (playerList) => playerList.map(getPlayerName).join(', ');
@@ -373,7 +464,7 @@ export default function VolleyballTeamRandomizer() {
     <div className="beach-app min-h-screen p-3 sm:p-6 lg:p-10">
       <div className="beach-orb beach-orb-one" aria-hidden="true" />
       <div className="beach-orb beach-orb-two" aria-hidden="true" />
-      <main className="relative mx-auto max-w-5xl overflow-hidden rounded-[2rem] border border-white/70 bg-white/90 shadow-2xl shadow-sky-950/15 backdrop-blur-xl">
+      <main aria-busy={!isHydrated} className="relative mx-auto max-w-5xl overflow-hidden rounded-[2rem] border border-white/70 bg-white/90 shadow-2xl shadow-sky-950/15 backdrop-blur-xl">
         <header className="hero-panel relative overflow-hidden px-5 py-10 text-white sm:px-10 sm:py-14">
           <div className="relative z-10 max-w-2xl">
             <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/15 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.2em] backdrop-blur">
@@ -525,7 +616,7 @@ export default function VolleyballTeamRandomizer() {
         <div className="action-dock mb-10 flex flex-col gap-3 rounded-2xl p-3 sm:flex-row">
           <button
             onClick={generateTeams}
-            disabled={!canGenerateTeams}
+            disabled={!isHydrated || !canGenerateTeams}
             className="generate-button flex flex-1 items-center justify-center gap-2 rounded-xl px-6 py-4 text-lg font-black text-white disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Shuffle className="h-5 w-5" />
@@ -540,6 +631,14 @@ export default function VolleyballTeamRandomizer() {
               Reset All
             </button>
           )}
+          <button
+            onClick={() => setIsStartOverOpen(true)}
+            disabled={!isHydrated}
+            className="flex items-center justify-center gap-2 rounded-xl bg-rose-50 px-6 py-3 font-bold text-rose-600 shadow-sm ring-1 ring-rose-100 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Trash2 className="h-5 w-5" />
+            Start Over
+          </button>
         </div>
 
         {guaranteedWaitingPlayers.length > 0 && teams.length === 0 && (
@@ -715,6 +814,44 @@ export default function VolleyballTeamRandomizer() {
         )}
         </div>
       </main>
+      {isStartOverOpen && (
+        <div
+          className="modal-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setIsStartOverOpen(false);
+            }
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="start-over-title"
+            aria-describedby="start-over-description"
+            className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl sm:p-8"
+          >
+            <h2 id="start-over-title" className="font-display text-2xl font-black text-sky-950">Start a new session?</h2>
+            <p id="start-over-description" className="mt-3 leading-relaxed text-slate-600">
+              This clears every player, court setting, matchup, and round from this device. It cannot be undone.
+            </p>
+            <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                onClick={() => setIsStartOverOpen(false)}
+                className="rounded-xl bg-white px-5 py-3 font-bold text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+              >
+                Keep Session
+              </button>
+              <button
+                autoFocus
+                onClick={startOver}
+                className="rounded-xl bg-rose-600 px-5 py-3 font-bold text-white shadow-lg shadow-rose-600/20 hover:bg-rose-700"
+              >
+                Clear Everything
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
       <ToastContainer toasts={toasts} onDismiss={dismiss} />
     </div>
   );
