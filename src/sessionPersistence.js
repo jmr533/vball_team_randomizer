@@ -6,6 +6,7 @@ import {
   createPlayer,
   normalizePlayer
 } from './gameHelpers';
+import { DEFAULT_THEME, normalizeTheme } from './theme';
 
 export const SESSION_KEY = 'volleyball-session';
 export const SESSION_VERSION = 1;
@@ -51,16 +52,18 @@ export const createInitialSession = () => ({
   courtModes: [...DEFAULT_COURT_MODES],
   teams: [],
   sittingOut: [],
-  gameHistory: []
+  gameHistory: [],
+  theme: DEFAULT_THEME
 });
 
-export const createRoundResetSession = ({ players, courts, courtModes }) => ({
+export const createRoundResetSession = ({ players, courts, courtModes, theme }) => ({
   players,
   courts,
   courtModes,
   teams: [],
   sittingOut: [],
-  gameHistory: []
+  gameHistory: [],
+  theme: normalizeTheme(theme)
 });
 
 export const normalizeStoredSession = (storedSession) => {
@@ -78,7 +81,8 @@ export const normalizeStoredSession = (storedSession) => {
     sittingOut: normalizePlayers(storedSession.sittingOut),
     gameHistory: Array.isArray(storedSession.gameHistory)
       ? storedSession.gameHistory.filter(isRecord).map(normalizeGame)
-      : []
+      : [],
+    theme: normalizeTheme(storedSession.theme)
   };
 };
 

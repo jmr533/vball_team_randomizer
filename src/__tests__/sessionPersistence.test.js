@@ -21,6 +21,7 @@ describe('session persistence', () => {
     expect(restored.players[0].name).toBe('Alex');
     expect(restored.courts).toBe(4);
     expect(restored.courtModes).toEqual(['4v4', '2v2', '2v2', '2v2']);
+    expect(restored.theme).toBe('system');
   });
 
   it('rejects corrupt and incompatible stored values', () => {
@@ -50,6 +51,7 @@ describe('session persistence', () => {
     session.teams = [{ court: 1 }];
     session.sittingOut = [{ id: 'player-2', name: 'Taylor' }];
     session.gameHistory = [{ gameNumber: 1 }];
+    session.theme = 'dark';
 
     expect(createRoundResetSession(session)).toEqual({
       players: session.players,
@@ -57,8 +59,21 @@ describe('session persistence', () => {
       courtModes: session.courtModes,
       teams: [],
       sittingOut: [],
-      gameHistory: []
+      gameHistory: [],
+      theme: 'dark'
     });
+  });
+
+  it('restores valid themes and safely defaults invalid themes to system', () => {
+    const session = createInitialSession();
+    session.theme = 'dark';
+
+    expect(deserializeSession(serializeSession(session)).theme).toBe('dark');
+    expect(normalizeStoredSession({
+      version: SESSION_VERSION,
+      players: session.players,
+      theme: 'midnight'
+    }).theme).toBe('system');
   });
 
   it('loads the saved value through the Preferences interface', async () => {
