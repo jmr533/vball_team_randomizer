@@ -4,7 +4,7 @@ let toastId = 0;
 
 /**
  * Custom hook for managing toast notifications
- * @returns {Object} Object with toasts array and show function
+ * @returns {Object} Object with toasts array, dismiss, success, and error functions
  */
 export function useToast() {
   const [toasts, setToasts] = useState([]);
@@ -24,14 +24,10 @@ export function useToast() {
 
   const success = useCallback((message) => show(message, 'success'), [show]);
   const error = useCallback((message) => show(message, 'error'), [show]);
-  const info = useCallback((message) => show(message, 'info'), [show]);
-
   return {
     toasts,
     dismiss,
-    show,
     success,
-    error,
-    info
+    error
   };
 }
