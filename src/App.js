@@ -27,7 +27,7 @@ import {
  * 1. Players who sat out last game get priority to play next game
  * 2. Mode preferences are respected as hard rules (can't force someone into incompatible mode)
  * 3. Overall playing time is balanced across sessions
- * 4. Teammate pairings are distributed to avoid same pairs every game
+ * 4. Teammate-pairing history is tracked and displayed
  * 
  * State Management:
  * - players: Array of Player objects with id, name, and preferredModes
