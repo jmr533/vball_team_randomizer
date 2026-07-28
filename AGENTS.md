@@ -16,7 +16,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 ## Project Architecture
 
 ### High-Level Structure
-This is a React-based Progressive Web App (PWA) for organizing fair beach volleyball team rotation. The application runs entirely in the browser with no backend dependencies.
+This is a React app for organizing fair beach volleyball team rotation. The application runs entirely in the browser with no backend dependencies.
 
 ### Core Components and State Management
 - **App Component**: `src/App.js` owns UI state and team generation orchestration
@@ -37,7 +37,6 @@ This is a React-based Progressive Web App (PWA) for organizing fair beach volley
 - **Multi-Court Support**: Configure 1-4 courts with independent 2v2/3v3/4v4 modes
 
 ### Technical Architecture
-- **PWA Features**: Service worker (`public/sw.js`) with cache-first strategy for offline support
 - **Styling**: Tailwind CSS for responsive design and component styling
 - **Icons**: Lucide React for consistent iconography
 - **Toasts**: `src/Toast.js` and `src/useToast.js` for user feedback
@@ -50,8 +49,6 @@ This is a React-based Progressive Web App (PWA) for organizing fair beach volley
 - `src/index.css` - Tailwind CSS imports
 - `src/Toast.js` - Toast notification component
 - `src/useToast.js` - Toast state hook
-- `public/sw.js` - Service worker for offline caching
-- `public/manifest.json` - PWA manifest configuration
 
 ### State Flow
 1. Players are added to dynamic input array
