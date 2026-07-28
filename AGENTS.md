@@ -29,10 +29,7 @@ This is a React app for organizing fair beach volleyball team rotation. The appl
   - `waitingQueue`: Derived from the last game's `sittingOut` when between rounds (not separate state)
 
 ### Key Algorithms
-- **Fair Rotation System**: Three-tier priority system ensuring minimal sitting time
-  1. Players who sat out last game (guaranteed spots)
-  2. Players who sat out in previous games (secondary priority)
-  3. Random selection from remaining players
+- **Fair Rotation System**: Players who were eligible and sat out the previous game are prioritized for the next round. Other eligible players are then selected using sit-out, play-count, and preference-flexibility statistics, with a randomized tie-breaker.
 - **Team Generation**: Fisher-Yates shuffle algorithm for randomizing team assignments
 - **Multi-Court Support**: Configure 1-4 courts with independent 2v2/3v3/4v4 modes
 
@@ -45,7 +42,7 @@ This is a React app for organizing fair beach volleyball team rotation. The appl
 ### Key Files
 - `src/App.js` - Main application component and team generation UI
 - `src/gameHelpers.js` - Shared game logic, constants, and fairness helpers
-- `src/index.js` - React entry point with service worker registration
+- `src/index.js` - React entry point
 - `src/index.css` - Tailwind CSS imports
 - `src/Toast.js` - Toast notification component
 - `src/useToast.js` - Toast state hook
@@ -60,5 +57,4 @@ This is a React app for organizing fair beach volleyball team rotation. The appl
 ### Development Notes
 - Uses Create React App with standard ESLint configuration
 - Designed for static deployment on Vercel (or any static host) via `vercel.json`
-- PWA manifest includes offline support and mobile app-like experience
 - All game state is in-memory for the current browser session; refresh clears history
