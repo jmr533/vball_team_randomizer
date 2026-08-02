@@ -8,6 +8,10 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 - `npm start` - Start development server (runs on http://localhost:3000)
 - `npm run build` - Build production bundle
 - `npm test` - Run tests with React Testing Library
+- `npm run verify:web` - Run shared tests in CI mode and build the web app
+- `npm run android:sync` - Build the root web app and sync it into Capacitor Android
+- `npm run verify:android` - Sync Android, then run Gradle tests, lint, and debug build
+- `npm run verify:platforms` - Validate shared tests, web build, and Android wrapper together
 - `npm run eject` - Eject from Create React App (irreversible)
 
 ### Installation
@@ -16,7 +20,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 ## Project Architecture
 
 ### High-Level Structure
-This is a React app for organizing fair beach volleyball team rotation. The application runs entirely in the browser with no backend dependencies.
+`main` is the shared product branch for this React app. The root web UI and game logic are also the Android app's web source through Capacitor; do not maintain a separate Android React copy or feature branch. Native Gradle, assets, system bars, and bridge code stay under `android/` or native adapters.
 
 ### Core Components and State Management
 - **App Component**: `src/App.js` owns UI state and team generation orchestration
@@ -38,6 +42,8 @@ This is a React app for organizing fair beach volleyball team rotation. The appl
 - **Icons**: Lucide React for consistent iconography
 - **Toasts**: `src/Toast.js` and `src/useToast.js` for user feedback
 - **Focus Management**: Keyboard navigation with automatic focus handling for player input
+- **Persistence**: `src/session.js` defines the versioned session schema; `src/sessionStorage.js` selects localStorage in browsers and Capacitor Preferences on Android.
+- **Theme**: `src/theme.js` applies Light/Dark/System in the document; `src/nativeTheme.js` updates Android system bars only in a Capacitor runtime.
 
 ### Key Files
 - `src/App.js` - Main application component and team generation UI
@@ -57,4 +63,5 @@ This is a React app for organizing fair beach volleyball team rotation. The appl
 ### Development Notes
 - Uses Create React App with standard ESLint configuration
 - Designed for static deployment on Vercel (or any static host) via `vercel.json`
-- All game state is in-memory for the current browser session; refresh clears history
+- Browser sessions persist in localStorage; Android sessions persist in Capacitor Preferences.
+- Release signing and APK publication are explicit operations, never normal synchronization work.

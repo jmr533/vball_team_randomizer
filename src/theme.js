@@ -15,3 +15,10 @@ export const applyTheme = (theme, documentElement = document.documentElement) =>
   documentElement.dataset.theme = theme;
   documentElement.style.colorScheme = theme;
 };
+
+export const subscribeToSystemTheme = (onChange, matchMedia = window.matchMedia) => {
+  const query = matchMedia('(prefers-color-scheme: dark)');
+  const listener = () => onChange(getSystemTheme(matchMedia));
+  query.addEventListener('change', listener);
+  return () => query.removeEventListener('change', listener);
+};

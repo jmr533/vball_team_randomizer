@@ -7,7 +7,7 @@ import {
   createRoundResetSession,
   sessionStore
 } from './sessionPersistence';
-import { applyTheme, resolveTheme, THEME_OPTIONS } from './theme';
+import { applyTheme, resolveTheme, subscribeToSystemTheme, THEME_OPTIONS } from './theme';
 import { applyNativeTheme } from './nativeTheme';
 import {
   GAME_MODES,
@@ -120,7 +120,6 @@ export default function VolleyballTeamRandomizer() {
   }, [players, courts, courtModes, teams, sittingOut, gameHistory, theme, isHydrated, error]);
 
   useEffect(() => {
-    const colorSchemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const syncTheme = () => {
       const resolvedTheme = resolveTheme(theme, window.matchMedia);
       applyTheme(resolvedTheme);
@@ -136,8 +135,7 @@ export default function VolleyballTeamRandomizer() {
       return undefined;
     }
 
-    colorSchemeQuery.addEventListener('change', syncTheme);
-    return () => colorSchemeQuery.removeEventListener('change', syncTheme);
+    return subscribeToSystemTheme(syncTheme);
   }, [theme]);
 
   useEffect(() => {

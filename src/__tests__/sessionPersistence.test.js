@@ -3,7 +3,8 @@ import {
   SESSION_VERSION,
   createInitialSession,
   createRoundResetSession,
-  createSessionStore,
+  createAndroidSessionStore,
+  createBrowserSessionStore,
   deserializeSession,
   normalizeStoredSession,
   serializeSession
@@ -85,7 +86,7 @@ describe('session persistence', () => {
       remove: jest.fn()
     };
 
-    const restored = await createSessionStore(preferences).load();
+    const restored = await createAndroidSessionStore(preferences).load();
 
     expect(preferences.get).toHaveBeenCalledWith({ key: SESSION_KEY });
     expect(restored.players[0].name).toBe('Jordan');
@@ -114,7 +115,7 @@ describe('session persistence', () => {
         return Promise.resolve();
       })
     };
-    const store = createSessionStore(preferences);
+    const store = createAndroidSessionStore(preferences);
     const firstSession = createInitialSession();
     firstSession.players[0].name = 'First';
     const secondSession = createInitialSession();
@@ -139,10 +140,27 @@ describe('session persistence', () => {
       set: jest.fn(async () => events.push('save')),
       remove: jest.fn(async () => events.push('clear'))
     };
-    const store = createSessionStore(preferences);
+    const store = createAndroidSessionStore(preferences);
 
     await Promise.all([store.save(createInitialSession()), store.clear()]);
 
     expect(events).toEqual(['save', 'clear']);
+  });
+
+  it('uses localStorage through the browser adapter', async () => {
+    const storage = {
+      getItem: jest.fn().mockReturnValue(null),
+      setItem: jest.fn(),
+      removeItem: jest.fn()
+    };
+    const store = createBrowserSessionStore(storage);
+    const session = createInitialSession();
+    session.players[0].name = 'Browser player';
+
+    await store.save(session);
+    await store.clear();
+
+    expect(storage.setItem).toHaveBeenCalledWith(SESSION_KEY, serializeSession(session));
+    expect(storage.removeItem).toHaveBeenCalledWith(SESSION_KEY);
   });
 });

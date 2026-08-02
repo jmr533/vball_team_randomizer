@@ -1,6 +1,6 @@
 # Beach Volleyball Team Randomizer
 
-React and Capacitor app for fair beach volleyball team rotation across 1-4 courts. It runs as both a website and a native Android app, with the Android session stored locally on the device.
+`main` is the shared product branch for fair beach-volleyball team rotation across 1-4 courts. The root React app supplies the complete user interface and game logic for both the website and the Capacitor Android wrapper; there is no maintained Android feature branch.
 
 Website: https://vball-team-randomizer.vercel.app/
 
@@ -18,6 +18,15 @@ Open http://localhost:3000.
 ```bash
 npm run build
 ```
+
+## Validation
+
+- `npm run verify:web` runs the React tests once in CI mode and creates a production web build.
+- `npm run android:sync` builds that same root web app, then copies it into the Android wrapper.
+- `npm run verify:android` syncs Android and runs Gradle unit tests, lint, and a debug APK build.
+- `npm run verify:platforms` runs shared React tests once, then validates web and Android from the same checkout.
+
+Use `verify:web` for browser-only changes, `verify:android` for wrapper/native changes, and `verify:platforms` for shared UI, session, or theme changes.
 
 ## Android
 
@@ -101,11 +110,13 @@ npm run android:assets
 
 ### Local session behavior
 
-- Players, courts, modes, current teams, sitting-out players, and round history survive an app restart.
+- One versioned session schema stores players, courts, modes, current teams, sitting-out players, round history, and the appearance setting. The browser stores it in `localStorage`; Android stores it with Capacitor Preferences.
 - Appearance can be set to **Light**, **Dark**, or **System** and is restored on restart.
 - **Reset All** clears matchups and round history while keeping the roster and court setup.
 - **Start Over** asks for confirmation, then clears all saved session data and returns the theme to **System**.
-- The application assets and fonts are bundled, so team generation works offline.
+- The application assets and fonts are bundled, so Android team generation works offline.
+
+Release signing and release APK creation are explicit tasks, not part of normal synchronization or validation.
 
 ## Test
 
@@ -118,6 +129,8 @@ npm test
 - `src/App.js` - main UI and team generation
 - `src/gameHelpers.js` - game constants and fairness helpers
 - `src/Toast.js` / `src/useToast.js` - toast notifications
-- `src/sessionPersistence.js` - versioned, queued on-device session storage
+- `src/session.js` - shared versioned session schema, serialization, and normalization
+- `src/sessionStorage.js` - queued browser (`localStorage`) and Android (Capacitor Preferences) adapters
+- `src/theme.js` / `src/nativeTheme.js` - shared document theme and Android-only system-bar bridge
 - `capacitor.config.json` - native app identity and web asset configuration
 - `android/` - generated and configured native Android project

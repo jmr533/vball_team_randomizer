@@ -1,4 +1,4 @@
-import { applyTheme, getSystemTheme, normalizeTheme, resolveTheme } from '../theme';
+import { applyTheme, getSystemTheme, normalizeTheme, resolveTheme, subscribeToSystemTheme } from '../theme';
 
 describe('theme helpers', () => {
   const matchMedia = (matches) => jest.fn().mockReturnValue({ matches });
@@ -24,5 +24,22 @@ describe('theme helpers', () => {
 
     expect(documentElement.dataset.theme).toBe('dark');
     expect(documentElement.style.colorScheme).toBe('dark');
+  });
+
+  it('reacts to OS changes while System is selected', () => {
+    let listener;
+    const query = {
+      addEventListener: jest.fn((event, callback) => { listener = callback; }),
+      removeEventListener: jest.fn()
+    };
+    const matchMedia = jest.fn().mockReturnValue(query);
+    const onChange = jest.fn();
+
+    const unsubscribe = subscribeToSystemTheme(onChange, matchMedia);
+    listener();
+    unsubscribe();
+
+    expect(onChange).toHaveBeenCalledWith('light');
+    expect(query.removeEventListener).toHaveBeenCalledWith('change', expect.any(Function));
   });
 });
