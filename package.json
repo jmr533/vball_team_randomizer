@@ -29,7 +29,7 @@
     "android:sync": "npm run build && cap sync android",
     "verify:android": "npm run android:sync && cd android && ./gradlew test lint assembleDebug",
     "verify:platforms": "CI=true react-scripts test --watchAll=false && npm run build && ./node_modules/.bin/cap sync android && cd android && ./gradlew test lint assembleDebug",
-    "android:assets": "capacitor-assets generate --android --iconBackgroundColor '#075985' --iconBackgroundColorDark '#075985' --splashBackgroundColor '#dff6f5' --splashBackgroundColorDark '#082f49'",
+    "android:assets": "capacitor-assets generate --android --iconBackgroundColor '#075985' --iconBackgroundColorDark '#075985' --splashBackgroundColor '#dff6f5' --splashBackgroundColorDark '#082f49' && node scripts/generate-android-icon.js",
     "android:open": "cap open android",
     "android:build:debug": "npm run android:sync && cd android && ./gradlew assembleDebug",
     "android:build:release": "npm run android:sync && cd android && ./gradlew assembleRelease",
