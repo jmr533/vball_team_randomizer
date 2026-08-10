@@ -4,33 +4,14 @@ import { AlertCircle, CheckCircle, Info, X } from 'lucide-react';
 const TOAST_DURATION = 4000; // 4 seconds
 
 const TOAST_TYPES = {
-  success: {
-    bg: 'bg-green-50',
-    border: 'border-green-200',
-    icon: CheckCircle,
-    iconColor: 'text-green-600',
-    text: 'text-green-800'
-  },
-  error: {
-    bg: 'bg-red-50',
-    border: 'border-red-200',
-    icon: AlertCircle,
-    iconColor: 'text-red-600',
-    text: 'text-red-800'
-  },
-  info: {
-    bg: 'bg-blue-50',
-    border: 'border-blue-200',
-    icon: Info,
-    iconColor: 'text-blue-600',
-    text: 'text-blue-800'
-  }
+  success: CheckCircle,
+  error: AlertCircle,
+  info: Info
 };
 
 export function Toast({ id, message, type = 'info', onDismiss }) {
   const [isExiting, setIsExiting] = useState(false);
-  const typeConfig = TOAST_TYPES[type] || TOAST_TYPES.info;
-  const IconComponent = typeConfig.icon;
+  const IconComponent = TOAST_TYPES[type] || TOAST_TYPES.info;
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -48,34 +29,27 @@ export function Toast({ id, message, type = 'info', onDismiss }) {
 
   return (
     <div
-      className={`transform transition-all duration-300 ${
-        isExiting ? 'translate-x-96 opacity-0' : 'translate-x-0 opacity-100'
-      }`}
+      role="status"
+      className={`toast toast-${type} ${isExiting ? 'toast-exit' : ''}`}
     >
-      <div
-        className={`flex items-start gap-3 rounded-2xl border ${typeConfig.bg} ${typeConfig.border} p-4 shadow-xl backdrop-blur`}
+      <IconComponent className="toast-icon h-5 w-5" />
+      <p className="toast-message">{message}</p>
+      <button
+        onClick={handleDismiss}
+        className="toast-dismiss"
+        aria-label="Dismiss"
       >
-        <IconComponent className={`h-5 w-5 flex-shrink-0 ${typeConfig.iconColor}`} />
-        <p className={`flex-1 ${typeConfig.text} text-sm font-medium`}>{message}</p>
-        <button
-          onClick={handleDismiss}
-          className={`flex-shrink-0 ${typeConfig.text} opacity-50 hover:opacity-100 transition-opacity`}
-          aria-label="Dismiss"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
+        <X className="h-4 w-4" />
+      </button>
     </div>
   );
 }
 
 export function ToastContainer({ toasts, onDismiss }) {
   return (
-    <div className="fixed bottom-4 right-4 z-50 space-y-2 pointer-events-none">
+    <div className="toast-wrap">
       {toasts.map((toast) => (
-        <div key={toast.id} className="pointer-events-auto">
-          <Toast {...toast} onDismiss={onDismiss} />
-        </div>
+        <Toast key={toast.id} {...toast} onDismiss={onDismiss} />
       ))}
     </div>
   );
