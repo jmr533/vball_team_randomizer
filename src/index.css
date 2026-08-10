@@ -233,8 +233,8 @@ button { cursor: pointer; }
 
 .scoreboard {
   position: relative;
-  background: var(--slab);
-  color: var(--slab-ink);
+  background: var(--card);
+  color: var(--ink);
   padding: 1.4rem 1.4rem 1.7rem;
 }
 
@@ -274,7 +274,7 @@ button { cursor: pointer; }
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.22em;
-  color: var(--slab-muted);
+  color: var(--muted);
   text-transform: uppercase;
 }
 
@@ -285,16 +285,16 @@ button { cursor: pointer; }
   line-height: 1;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--slab-ink);
+  color: var(--ink);
 }
 
 .theme-switcher {
   display: flex;
   gap: 0.2rem;
   padding: 0.2rem;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid var(--line);
   border-radius: 0.55rem;
-  background: rgba(0, 0, 0, 0.24);
+  background: var(--card-2);
 }
 
 .theme-option {
@@ -303,7 +303,7 @@ button { cursor: pointer; }
   gap: 0.35rem;
   border-radius: 0.4rem;
   padding: 0.42rem 0.6rem;
-  color: var(--slab-muted);
+  color: var(--muted);
   font-size: 0.66rem;
   font-weight: 700;
   letter-spacing: 0.14em;
@@ -311,13 +311,13 @@ button { cursor: pointer; }
   transition: background 0.15s, color 0.15s, transform 0.15s;
 }
 
-.theme-option:hover { color: var(--slab-ink); background: rgba(255, 255, 255, 0.08); }
+.theme-option:hover { color: var(--ink); background: var(--canvas); }
 
 .theme-option:active { transform: translateY(1px); }
 
 .theme-option[aria-pressed='true'] {
-  color: var(--slab);
-  background: var(--slab-ink);
+  color: var(--card);
+  background: var(--ink);
 }
 
 .scoreboard-tagline {
@@ -344,7 +344,7 @@ button { cursor: pointer; }
 .tagline-sub {
   margin: 0.8rem 0 0;
   max-width: 34rem;
-  color: var(--slab-muted);
+  color: var(--muted);
   font-size: 0.95rem;
   line-height: 1.55;
 }
@@ -355,9 +355,9 @@ button { cursor: pointer; }
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   margin-top: 1.4rem;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--line);
   border-radius: 0.5rem;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--card-2);
   overflow: hidden;
 }
 
@@ -366,7 +366,7 @@ button { cursor: pointer; }
   flex-direction: column;
   gap: 0.15rem;
   padding: 0.65rem 1rem;
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  border-left: 1px solid var(--line);
 }
 
 .ticker-cell:first-child { border-left: 0; }
@@ -376,14 +376,14 @@ button { cursor: pointer; }
   font-weight: 700;
   font-size: 1.72rem;
   line-height: 1;
-  color: var(--slab-ink);
+  color: var(--ink);
 }
 
 .ticker-label {
   font-size: 0.64rem;
   font-weight: 700;
   letter-spacing: 0.2em;
-  color: var(--slab-muted);
+  color: var(--muted);
   text-transform: uppercase;
 }
 
