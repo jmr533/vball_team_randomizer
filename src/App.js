@@ -24,7 +24,7 @@ import {
   hasAnyModePreference,
   getPreferenceLabel,
   getTeamGroupStats,
-  getPlayerRoundStats
+  allocateFairRound
 } from './gameHelpers';
 
 /**
@@ -308,124 +308,32 @@ export default function VolleyballTeamRandomizer() {
 
     const activeCourts = Math.max(1, Math.min(courts, MAX_COURTS));
     const activeModes = courtModes.slice(0, activeCourts);
-    const totalSpotsAvailable = activeModes.reduce(
-      (totalSpots, mode) => totalSpots + getPlayersPerCourt(mode),
-      0
-    );
-    const lastGameSitting = gameHistory.length > 0 ? gameHistory[gameHistory.length - 1].sittingOut : [];
-    const validPlayersById = new Map(validPlayers.map((player) => [player.id, player]));
-    const waitingPlayerIds = new Set(lastGameSitting.map((player) => player.id));
-    const priorityPlayers = Array.from(waitingPlayerIds)
-      .map((playerId) => validPlayersById.get(playerId))
-      .filter(Boolean);
-    const otherPlayers = validPlayers.filter(
-      (player) => !waitingPlayerIds.has(player.id)
-    );
-    const allPlayersOrdered = [
-      ...shuffleArray(priorityPlayers),
-      ...shuffleArray(otherPlayers)
-    ];
-
-    const remainingPlayers = [...allPlayersOrdered];
-    const playingPlayers = [];
-    const newTeams = [];
-    const playerRoundStats = getPlayerRoundStats(gameHistory);
-    const playerPriorityIndex = new Map(
-      allPlayersOrdered.map((player, index) => [player.id, index])
-    );
-    const playerPriorityTier = new Map([
-      ...priorityPlayers.map((player) => [player.id, 0]),
-      ...otherPlayers.map((player) => [player.id, 1])
-    ]);
-    const courtConfigs = activeModes.map((mode, index) => ({
-      court: index + 1,
-      mode,
-      playersPerCourt: getPlayersPerCourt(mode),
-      eligibleCount: validPlayers.filter((player) => isPlayerEligibleForMode(player, mode)).length
-    })).sort((courtA, courtB) => {
-      if (courtA.eligibleCount !== courtB.eligibleCount) {
-        return courtA.eligibleCount - courtB.eligibleCount;
-      }
-
-      return courtB.playersPerCourt - courtA.playersPerCourt;
+    const assignments = allocateFairRound({
+      players: validPlayers,
+      courtModes: activeModes,
+      gameHistory
     });
 
-    const takeEligiblePlayers = (mode, count) => {
-      const selectedPlayers = remainingPlayers
-        .filter((player) => isPlayerEligibleForMode(player, mode))
-        .sort((playerA, playerB) => {
-          const tierDifference = playerPriorityTier.get(playerA.id) - playerPriorityTier.get(playerB.id);
-
-          if (tierDifference !== 0) {
-            return tierDifference;
-          }
-
-          const playerAStats = playerRoundStats.get(playerA.id) || { played: 0, satOut: 0, lastSatOutGame: 0 };
-          const playerBStats = playerRoundStats.get(playerB.id) || { played: 0, satOut: 0, lastSatOutGame: 0 };
-          const sitOutDifference = playerBStats.satOut - playerAStats.satOut;
-
-          if (sitOutDifference !== 0) {
-            return sitOutDifference;
-          }
-
-          const playedDifference = playerAStats.played - playerBStats.played;
-
-          if (playedDifference !== 0) {
-            return playedDifference;
-          }
-
-          const lastSatOutDifference = playerBStats.lastSatOutGame - playerAStats.lastSatOutGame;
-
-          if (lastSatOutDifference !== 0) {
-            return lastSatOutDifference;
-          }
-
-          const flexibilityDifference = normalizePreferredModes(playerA.preferredModes).length -
-            normalizePreferredModes(playerB.preferredModes).length;
-
-          if (flexibilityDifference !== 0) {
-            return flexibilityDifference;
-          }
-
-          return playerPriorityIndex.get(playerA.id) - playerPriorityIndex.get(playerB.id);
-        })
-        .slice(0, count);
-      const selectedPlayerIds = new Set(selectedPlayers.map((player) => player.id));
-
-      for (let index = remainingPlayers.length - 1; index >= 0; index--) {
-        if (selectedPlayerIds.has(remainingPlayers[index].id)) {
-          remainingPlayers.splice(index, 1);
-        }
-      }
-
-      return selectedPlayers;
-    };
-
-    courtConfigs.forEach(({ court, mode, playersPerCourt }) => {
-      const courtPlayers = takeEligiblePlayers(mode, playersPerCourt);
-
-      if (courtPlayers.length === playersPerCourt) {
-        const shuffledCourtPlayers = shuffleArray(courtPlayers);
-        const teamSize = playersPerCourt / 2;
-        playingPlayers.push(...courtPlayers);
-        newTeams.push({
-          court,
-          gameMode: mode,
-          team1: shuffledCourtPlayers.slice(0, teamSize),
-          team2: shuffledCourtPlayers.slice(teamSize)
-        });
-      }
-    });
-
-    newTeams.sort((courtA, courtB) => courtA.court - courtB.court);
-
-    if (playingPlayers.length !== totalSpotsAvailable || newTeams.length !== activeCourts) {
+    if (!assignments) {
       error('Unable to fill courts. Check player preferences and try again.');
       return;
     }
 
+    const playingPlayers = assignments.flatMap(({ players: courtPlayers }) => courtPlayers);
+    const newTeams = assignments.map(({ court, mode, players: courtPlayers }) => {
+      const shuffledCourtPlayers = shuffleArray(courtPlayers);
+      const teamSize = courtPlayers.length / 2;
+
+      return {
+        court,
+        gameMode: mode,
+        team1: shuffledCourtPlayers.slice(0, teamSize),
+        team2: shuffledCourtPlayers.slice(teamSize)
+      };
+    });
+
     const playingPlayerIds = new Set(playingPlayers.map((player) => player.id));
-    const newSittingOut = allPlayersOrdered.filter((player) => !playingPlayerIds.has(player.id));
+    const newSittingOut = validPlayers.filter((player) => !playingPlayerIds.has(player.id));
 
     const newGame = {
       gameNumber: gameHistory.length + 1,

@@ -149,6 +149,206 @@ const getPlayerRoundStats = (games) => {
   return statsByPlayerId;
 };
 
+const shuffleArray = (array, random) => {
+  const shuffled = [...array];
+
+  for (let index = shuffled.length - 1; index > 0; index--) {
+    const randomIndex = Math.floor(random() * (index + 1));
+    [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
+  }
+
+  return shuffled;
+};
+
+const canFillCourtRequirements = (players, courtRequirements) => {
+  const requiredPlayers = courtRequirements.reduce(
+    (total, { playersPerCourt }) => total + playersPerCourt,
+    0
+  );
+
+  if (players.length < requiredPlayers) {
+    return false;
+  }
+
+  const playerOffset = 1;
+  const courtOffset = playerOffset + players.length;
+  const sink = courtOffset + courtRequirements.length;
+  const graph = Array.from({ length: sink + 1 }, () => []);
+  const addEdge = (from, to, capacity) => {
+    graph[from].push({ to, capacity, reverse: graph[to].length });
+    graph[to].push({ to: from, capacity: 0, reverse: graph[from].length - 1 });
+  };
+
+  players.forEach((player, playerIndex) => {
+    const playerNode = playerOffset + playerIndex;
+    addEdge(0, playerNode, 1);
+
+    courtRequirements.forEach(({ mode }, courtIndex) => {
+      if (isPlayerEligibleForMode(player, mode)) {
+        addEdge(playerNode, courtOffset + courtIndex, 1);
+      }
+    });
+  });
+
+  courtRequirements.forEach(({ playersPerCourt }, courtIndex) => {
+    addEdge(courtOffset + courtIndex, sink, playersPerCourt);
+  });
+
+  let flow = 0;
+
+  while (flow < requiredPlayers) {
+    const parent = Array(sink + 1).fill(null);
+    const queue = [0];
+    parent[0] = { node: -1, edge: -1 };
+
+    for (let queueIndex = 0; queueIndex < queue.length && !parent[sink]; queueIndex++) {
+      const node = queue[queueIndex];
+
+      graph[node].forEach((edge, edgeIndex) => {
+        if (edge.capacity > 0 && !parent[edge.to]) {
+          parent[edge.to] = { node, edge: edgeIndex };
+          queue.push(edge.to);
+        }
+      });
+    }
+
+    if (!parent[sink]) {
+      return false;
+    }
+
+    for (let node = sink; node !== 0; node = parent[node].node) {
+      const { node: previousNode, edge: edgeIndex } = parent[node];
+      const edge = graph[previousNode][edgeIndex];
+      edge.capacity -= 1;
+      graph[node][edge.reverse].capacity += 1;
+    }
+
+    flow += 1;
+  }
+
+  return true;
+};
+
+const allocateFairRound = ({
+  players,
+  courtModes,
+  gameHistory,
+  random = Math.random
+}) => {
+  const lastGame = gameHistory[gameHistory.length - 1];
+  const previouslyEligibleWaitingIds = new Set(
+    (lastGame?.sittingOut || [])
+      .filter((player) => canPlayerPlaySelectedModes(player, lastGame?.courtModes || []))
+      .map((player) => player.id)
+  );
+  const priorityPlayers = players.filter((player) => previouslyEligibleWaitingIds.has(player.id));
+  const otherPlayers = players.filter((player) => !previouslyEligibleWaitingIds.has(player.id));
+  const orderedPlayers = [
+    ...shuffleArray(priorityPlayers, random),
+    ...shuffleArray(otherPlayers, random)
+  ];
+  const playerPriorityIndex = new Map(
+    orderedPlayers.map((player, index) => [player.id, index])
+  );
+  const playerPriorityTier = new Map([
+    ...priorityPlayers.map((player) => [player.id, 0]),
+    ...otherPlayers.map((player) => [player.id, 1])
+  ]);
+  const playerRoundStats = getPlayerRoundStats(gameHistory);
+  const comparePlayers = (playerA, playerB) => {
+    const tierDifference = playerPriorityTier.get(playerA.id) - playerPriorityTier.get(playerB.id);
+
+    if (tierDifference !== 0) {
+      return tierDifference;
+    }
+
+    const playerAStats = playerRoundStats.get(playerA.id) || { played: 0, satOut: 0, lastSatOutGame: 0 };
+    const playerBStats = playerRoundStats.get(playerB.id) || { played: 0, satOut: 0, lastSatOutGame: 0 };
+    const sitOutDifference = playerBStats.satOut - playerAStats.satOut;
+
+    if (sitOutDifference !== 0) {
+      return sitOutDifference;
+    }
+
+    const playedDifference = playerAStats.played - playerBStats.played;
+
+    if (playedDifference !== 0) {
+      return playedDifference;
+    }
+
+    const lastSatOutDifference = playerAStats.lastSatOutGame - playerBStats.lastSatOutGame;
+
+    if (lastSatOutDifference !== 0) {
+      return lastSatOutDifference;
+    }
+
+    const flexibilityDifference = normalizePreferredModes(playerA.preferredModes).length -
+      normalizePreferredModes(playerB.preferredModes).length;
+
+    if (flexibilityDifference !== 0) {
+      return flexibilityDifference;
+    }
+
+    return playerPriorityIndex.get(playerA.id) - playerPriorityIndex.get(playerB.id);
+  };
+  const courtConfigs = courtModes.map((mode, index) => ({
+    court: index + 1,
+    mode,
+    playersPerCourt: getPlayersPerCourt(mode),
+    eligibleCount: players.filter((player) => isPlayerEligibleForMode(player, mode)).length
+  })).sort((courtA, courtB) => {
+    if (courtA.eligibleCount !== courtB.eligibleCount) {
+      return courtA.eligibleCount - courtB.eligibleCount;
+    }
+
+    return courtB.playersPerCourt - courtA.playersPerCourt;
+  });
+  const assignments = [];
+  let remainingPlayers = [...orderedPlayers];
+
+  for (let courtIndex = 0; courtIndex < courtConfigs.length; courtIndex++) {
+    const courtConfig = courtConfigs[courtIndex];
+    const courtPlayers = [];
+    const candidates = remainingPlayers
+      .filter((player) => isPlayerEligibleForMode(player, courtConfig.mode))
+      .sort(comparePlayers);
+
+    for (const candidate of candidates) {
+      if (courtPlayers.length === courtConfig.playersPerCourt) {
+        break;
+      }
+
+      const playersAfterSelection = remainingPlayers.filter(({ id }) => id !== candidate.id);
+      const remainingRequirements = [
+        {
+          ...courtConfig,
+          playersPerCourt: courtConfig.playersPerCourt - courtPlayers.length - 1
+        },
+        ...courtConfigs.slice(courtIndex + 1)
+      ].filter(({ playersPerCourt }) => playersPerCourt > 0);
+
+      if (!canFillCourtRequirements(playersAfterSelection, remainingRequirements)) {
+        continue;
+      }
+
+      courtPlayers.push(candidate);
+      remainingPlayers = playersAfterSelection;
+    }
+
+    if (courtPlayers.length !== courtConfig.playersPerCourt) {
+      return null;
+    }
+
+    assignments.push({
+      court: courtConfig.court,
+      mode: courtConfig.mode,
+      players: courtPlayers
+    });
+  }
+
+  return assignments.sort((courtA, courtB) => courtA.court - courtB.court);
+};
+
 export {
   GAME_MODES,
   MAX_COURTS,
@@ -165,5 +365,6 @@ export {
   hasAnyModePreference,
   getPreferenceLabel,
   getTeamGroupStats,
-  getPlayerRoundStats
+  getPlayerRoundStats,
+  allocateFairRound
 };

@@ -9,7 +9,8 @@ import {
   isPlayerEligibleForMode,
   canPlayerPlaySelectedModes,
   getPlayerRoundStats,
-  getTeamGroupStats
+  getTeamGroupStats,
+  allocateFairRound
 } from '../gameHelpers';
 
 describe('Fairness Algorithm - Helper Functions', () => {
@@ -272,6 +273,98 @@ describe('Fairness Algorithm - Helper Functions', () => {
       const stats = getTeamGroupStats(games);
       expect(stats[0].count).toBe(2); // p1+p2 appears twice
       expect(stats[1].count).toBe(1); // p1+p3 appears once
+    });
+  });
+  describe('allocateFairRound', () => {
+    const player = (id, preferredModes) => ({ id, name: id, preferredModes });
+
+    it('reserves multi-mode players for courts that require them', () => {
+      const twoVsTwoOnly = ['a1', 'a2', 'a3', 'a4'].map((id) => player(id, ['2v2']));
+      const threeVsThreeOnly = ['b1', 'b2', 'b3', 'b4', 'b5'].map((id) => player(id, ['3v3']));
+      const flexiblePlayer = player('flex', ['2v2', '3v3', '4v4']);
+      const assignments = allocateFairRound({
+        players: [...twoVsTwoOnly, ...threeVsThreeOnly, flexiblePlayer],
+        courtModes: ['2v2', '3v3'],
+        gameHistory: [{
+          gameNumber: 1,
+          courtModes: ['3v3'],
+          playing: [],
+          sittingOut: [flexiblePlayer]
+        }],
+        random: () => 0
+      });
+
+      expect(assignments).toHaveLength(2);
+      expect(assignments[0].court).toBe(1);
+      expect(assignments[0].mode).toBe('2v2');
+      expect(assignments[0].players.map(({ id }) => id).sort()).toEqual(
+        twoVsTwoOnly.map(({ id }) => id)
+      );
+      expect(assignments[1].court).toBe(2);
+      expect(assignments[1].mode).toBe('3v3');
+      expect(assignments[1].players.map(({ id }) => id).sort()).toEqual(
+        [...threeVsThreeOnly, flexiblePlayer].map(({ id }) => id).sort()
+      );
+    });
+
+    it('does not prioritize someone who was ineligible in the previous round', () => {
+      const currentPlayer = player('changed-preference', ['2v2', '3v3', '4v4']);
+      const historicPlayer = player('changed-preference', ['3v3']);
+      const twoVsTwoOnly = ['a', 'b', 'c', 'd'].map((id) => player(id, ['2v2']));
+      const assignments = allocateFairRound({
+        players: [...twoVsTwoOnly, currentPlayer],
+        courtModes: ['2v2'],
+        gameHistory: [{
+          gameNumber: 1,
+          courtModes: ['2v2'],
+          playing: [],
+          sittingOut: [historicPlayer]
+        }],
+        random: () => 0
+      });
+
+      expect(assignments[0].players.map(({ id }) => id).sort()).toEqual(
+        twoVsTwoOnly.map(({ id }) => id)
+      );
+    });
+
+    it('selects the player who sat out longest ago when other statistics tie', () => {
+      const oldestWaiter = player('oldest', ['2v2']);
+      const recentWaiter = player('recent', ['2v2']);
+      const frequentWaiters = ['c', 'd', 'e'].map((id) => player(id, ['2v2']));
+      const assignments = allocateFairRound({
+        players: [oldestWaiter, recentWaiter, ...frequentWaiters],
+        courtModes: ['2v2'],
+        gameHistory: [
+          {
+            gameNumber: 1,
+            courtModes: ['2v2'],
+            playing: [],
+            sittingOut: [oldestWaiter, ...frequentWaiters]
+          },
+          {
+            gameNumber: 2,
+            courtModes: ['2v2'],
+            playing: [],
+            sittingOut: [recentWaiter, ...frequentWaiters]
+          },
+          {
+            gameNumber: 3,
+            courtModes: ['2v2'],
+            playing: [],
+            sittingOut: []
+          }
+        ],
+        random: () => 0
+      });
+
+      expect(assignments[0].players.map(({ id }) => id)).toEqual(
+        expect.arrayContaining([
+          ...frequentWaiters.map(({ id }) => id),
+          oldestWaiter.id
+        ])
+      );
+      expect(assignments[0].players.map(({ id }) => id)).not.toContain(recentWaiter.id);
     });
   });
 });
