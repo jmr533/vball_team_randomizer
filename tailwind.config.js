@@ -2,7 +2,12 @@
 module.exports = {
   content: ['./src/**/*.{js,jsx,ts,tsx}', './public/index.html'],
   theme: {
-    extend: {}
+    extend: {
+      fontFamily: {
+        display: ['"Barlow Condensed"', '"Arial Narrow"', 'sans-serif'],
+        mono: ['"Space Mono"', 'ui-monospace', '"SF Mono"', 'Menlo', 'monospace']
+      }
+    }
   },
   plugins: []
 };
