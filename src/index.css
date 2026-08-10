@@ -268,8 +268,6 @@ button { cursor: pointer; }
   flex: none;
 }
 
-.wordmark-mark svg { display: block; }
-
 .wordmark-text { display: flex; flex-direction: column; gap: 0.1rem; }
 
 .wordmark-eyebrow {
@@ -1043,12 +1041,13 @@ button { cursor: pointer; }
   background: var(--card);
 }
 
-.ready-mark {
-  margin: 0 auto 1rem;
-  width: 3.2rem;
-  height: 3.2rem;
-  color: var(--faint);
-  opacity: 0.8;
+.ready-emoji {
+  display: block;
+  margin: 0 auto 1.1rem;
+  width: clamp(8rem, 28vw, 12rem);
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
 }
 
 .ready-title {
