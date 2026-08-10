@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, Minus, Monitor, Moon, Plus, RotateCcw, Sun, Trash2 } from 'lucide-react';
+import heroEmoji from './assets/hero-emoji.png';
 import { ToastContainer } from './Toast';
 import { useToast } from './useToast';
 import {
@@ -57,26 +58,6 @@ import {
  */
 
 const pad2 = (value) => String(value).padStart(2, '0');
-
-function VolleyballMark({ className = '' }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      className={className}
-    >
-      <circle cx="12" cy="12" r="10" />
-      <path d="M12 2 C 8.2 7.4, 5.4 10.6, 3.3 13.2" />
-      <path d="M3.3 13.2 C 8.6 15.6, 15.4 15.6, 20.7 13.2" />
-      <path d="M20.7 13.2 C 18.6 10.6, 15.8 7.4, 12 2" />
-    </svg>
-  );
-}
 
 export default function VolleyballTeamRandomizer() {
   const [players, setPlayers] = useState([createPlayer()]);
@@ -420,7 +401,7 @@ export default function VolleyballTeamRandomizer() {
         <header className="scoreboard">
           <div className="scoreboard-top">
             <div className="wordmark">
-              <VolleyballMark className="wordmark-mark" />
+              <img className="wordmark-mark" src={heroEmoji} alt="" aria-hidden="true" />
               <span className="wordmark-text">
                 <span className="wordmark-eyebrow">Beach Volleyball</span>
                 <span className="wordmark-title">Team Randomizer</span>
@@ -687,7 +668,7 @@ export default function VolleyballTeamRandomizer() {
                 )}
 
                 <div className="ready-panel">
-                  <VolleyballMark className="ready-mark" />
+                  <img className="ready-emoji" src={heroEmoji} alt="" aria-hidden="true" />
                   <h3 className="ready-title">Waiting for the whistle</h3>
                   <p className="ready-note">
                     Set your courts, build the lineup, then hit Generate to drop the first matchups. Whoever sits out gets priority next round — the rotation stays fair all night.
