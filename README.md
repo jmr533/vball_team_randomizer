@@ -1,4 +1,4 @@
-# Beach Volleyball Team Randomizer
+# Beach Volleyball Team Randomiser
 
 `main` is the shared product branch for fair beach-volleyball team rotation across 1-4 courts. The root React app supplies the complete user interface and game logic for both the website and the Capacitor Android wrapper; there is no maintained Android feature branch.
 
