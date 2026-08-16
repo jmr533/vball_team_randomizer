@@ -46,6 +46,10 @@
   --font-display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
   --font-body: 'Archivo', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'Space Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --app-safe-area-top: max(env(safe-area-inset-top), var(--safe-area-inset-top, 0px));
+  --app-safe-area-right: max(env(safe-area-inset-right), var(--safe-area-inset-right, 0px));
+  --app-safe-area-bottom: max(env(safe-area-inset-bottom), var(--safe-area-inset-bottom, 0px));
+  --app-safe-area-left: max(env(safe-area-inset-left), var(--safe-area-inset-left, 0px));
 }
 
 @media (prefers-color-scheme: dark) {
@@ -195,7 +199,20 @@ button { cursor: pointer; }
 
 .beach-app {
   min-height: 100vh;
+  padding: calc(0.75rem + var(--app-safe-area-top)) calc(0.75rem + var(--app-safe-area-right)) calc(0.75rem + var(--app-safe-area-bottom)) calc(0.75rem + var(--app-safe-area-left));
   background: var(--flood), linear-gradient(180deg, var(--canvas) 0%, var(--canvas-deep) 100%);
+}
+
+@media (min-width: 640px) {
+  .beach-app {
+    padding: calc(1.5rem + var(--app-safe-area-top)) calc(1.5rem + var(--app-safe-area-right)) calc(1.5rem + var(--app-safe-area-bottom)) calc(1.5rem + var(--app-safe-area-left));
+  }
+}
+
+@media (min-width: 1024px) {
+  .beach-app {
+    padding: calc(2.5rem + var(--app-safe-area-top)) calc(2.5rem + var(--app-safe-area-right)) calc(2.5rem + var(--app-safe-area-bottom)) calc(2.5rem + var(--app-safe-area-left));
+  }
 }
 
 .app-shell {
@@ -1245,7 +1262,7 @@ button { cursor: pointer; }
   z-index: 60;
   display: grid;
   place-items: center;
-  padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+  padding: max(1rem, var(--app-safe-area-top)) max(1rem, var(--app-safe-area-right)) max(1rem, var(--app-safe-area-bottom)) max(1rem, var(--app-safe-area-left));
   background: rgba(7, 13, 22, 0.62);
   backdrop-filter: blur(4px);
 }
@@ -1326,8 +1343,8 @@ button { cursor: pointer; }
 
 .toast-wrap {
   position: fixed;
-  bottom: max(1rem, env(safe-area-inset-bottom));
-  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(1rem, var(--app-safe-area-bottom));
+  right: max(1rem, var(--app-safe-area-right));
   z-index: 70;
   display: flex;
   flex-direction: column;
