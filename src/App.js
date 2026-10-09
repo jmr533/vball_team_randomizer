@@ -370,23 +370,12 @@ export default function VolleyballTeamRandomizer() {
       return;
     }
 
-    const idsOf = (team) => team.map((player) => player.id).sort().join(':');
-    const redealtTeams = teams.map((court) => {
-      const courtPlayers = [...court.team1, ...court.team2];
-      const teamSize = court.team1.length;
-      const previousSplit = new Set([idsOf(court.team1), idsOf(court.team2)]);
-      let shuffledPlayers = shuffleArray(courtPlayers);
-
-      for (let attempt = 0; attempt < 12 && previousSplit.has(idsOf(shuffledPlayers.slice(0, teamSize))); attempt += 1) {
-        shuffledPlayers = shuffleArray(courtPlayers);
-      }
-
-      return {
-        ...court,
-        team1: shuffledPlayers.slice(0, teamSize),
-        team2: shuffledPlayers.slice(teamSize)
-      };
-    });
+    // History still ends with the game being re-dealt, so its current teams
+    // count as "last game" and the new split avoids those partners too.
+    const redealtTeams = teams.map((court) => ({
+      ...court,
+      ...splitCourtIntoTeams({ players: [...court.team1, ...court.team2], gameHistory })
+    }));
 
     setTeams(redealtTeams);
     setGameHistory((previousGames) => previousGames.map((game, index) => (
