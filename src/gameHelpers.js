@@ -120,6 +120,105 @@ const getTeamGroupStats = (games) => {
   });
 };
 
+// How quickly an old partnership stops counting: last game = 1, the one
+// before = 0.6, then 0.36, and so on.
+const PARTNER_RECENCY_DECAY = 0.6;
+
+const getPartnerKey = (playerA, playerB) => [playerA.id, playerB.id].sort().join(':');
+
+const getTeammatePairs = (team) => team.flatMap((player, index) => (
+  team.slice(index + 1).map((teammate) => getPartnerKey(player, teammate))
+));
+
+const getPartnerHistory = (games) => {
+  const partnerHistory = new Map();
+
+  games.forEach((game, index) => {
+    const gamesAgo = games.length - index;
+    const weight = PARTNER_RECENCY_DECAY ** (gamesAgo - 1);
+
+    getGameTeamGroups(game).forEach(({ players }) => {
+      getTeammatePairs(players).forEach((key) => {
+        const existing = partnerHistory.get(key) || { weight: 0, lastGamesAgo: Infinity };
+        existing.weight += weight;
+        existing.lastGamesAgo = Math.min(existing.lastGamesAgo, gamesAgo);
+        partnerHistory.set(key, existing);
+      });
+    });
+  });
+
+  return partnerHistory;
+};
+
+const getCombinations = (items, size) => {
+  if (size === 0) {
+    return [[]];
+  }
+
+  return items.flatMap((item, index) => (
+    getCombinations(items.slice(index + 1), size - 1).map((combination) => [item, ...combination])
+  ));
+};
+
+const scoreSplit = (teams, partnerHistory) => {
+  return teams.flatMap(getTeammatePairs).reduce((score, key) => {
+    const history = partnerHistory.get(key);
+
+    if (!history) {
+      return score;
+    }
+
+    return {
+      lastGameRepeats: score.lastGameRepeats + (history.lastGamesAgo === 1 ? 1 : 0),
+      partnerWeight: score.partnerWeight + history.weight
+    };
+  }, { lastGameRepeats: 0, partnerWeight: 0 });
+};
+
+const compareSplitScores = (scoreA, scoreB) => {
+  if (scoreA.lastGameRepeats !== scoreB.lastGameRepeats) {
+    return scoreA.lastGameRepeats - scoreB.lastGameRepeats;
+  }
+
+  const weightDifference = scoreA.partnerWeight - scoreB.partnerWeight;
+  return Math.abs(weightDifference) < 1e-9 ? 0 : weightDifference;
+};
+
+/**
+ * Splits one court's players into two teams, avoiding recent partners.
+ * Never repeats a teammate pair from the previous game when any other split
+ * exists; beyond that, prefers partners who have played together least
+ * (recent games weigh more). Equal options are chosen at random.
+ */
+const splitCourtIntoTeams = ({ players, gameHistory = [], random = Math.random }) => {
+  const teamSize = players.length / 2;
+  const [anchorPlayer, ...otherPlayers] = players;
+  const partnerHistory = getPartnerHistory(gameHistory);
+
+  // Keeping the first player on team 1 skips mirror-image duplicates.
+  const candidates = getCombinations(otherPlayers, teamSize - 1).map((teammates) => {
+    const team1 = [anchorPlayer, ...teammates];
+    const team1Ids = new Set(team1.map((player) => player.id));
+    const team2 = otherPlayers.filter((player) => !team1Ids.has(player.id));
+
+    return { team1, team2, score: scoreSplit([team1, team2], partnerHistory) };
+  });
+
+  const bestScore = candidates.reduce((best, candidate) => (
+    compareSplitScores(candidate.score, best) < 0 ? candidate.score : best
+  ), candidates[0].score);
+  const bestCandidates = candidates.filter((candidate) => compareSplitScores(candidate.score, bestScore) === 0);
+  const chosen = bestCandidates[Math.floor(random() * bestCandidates.length)];
+  const [team1, team2] = random() < 0.5
+    ? [chosen.team1, chosen.team2]
+    : [chosen.team2, chosen.team1];
+
+  return {
+    team1: shuffleArray(team1, random),
+    team2: shuffleArray(team2, random)
+  };
+};
+
 const getPlayerRoundStats = (games) => {
   const statsByPlayerId = new Map();
 
@@ -366,5 +465,6 @@ export {
   getPreferenceLabel,
   getTeamGroupStats,
   getPlayerRoundStats,
+  splitCourtIntoTeams,
   allocateFairRound
 };

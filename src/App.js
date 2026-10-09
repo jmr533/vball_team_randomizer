@@ -22,6 +22,7 @@ import {
   canPlayerPlaySelectedModes,
   getPreferenceLabel,
   getTeamGroupStats,
+  splitCourtIntoTeams,
   allocateFairRound
 } from './gameHelpers';
 
@@ -32,7 +33,7 @@ import {
  * 1. Players who sat out last game get priority to play next game
  * 2. Mode preferences are respected as hard rules (can't force someone into incompatible mode)
  * 3. Overall playing time is balanced across sessions
- * 4. Teammate-pairing history is tracked and displayed
+ * 4. Partners rotate: nobody repeats last game's partner when another split exists
  *
  * State Management:
  * - players: Array of Player objects with id, name, and preferredModes
@@ -50,8 +51,8 @@ import {
  *
  * For each court:
  * - Select eligible players (respecting mode preferences)
- * - Shuffle their order before splitting into teams
- * - This ensures mode constraints don't create predictable team patterns
+ * - Split into the two teams that repeat the fewest recent partnerships
+ *   (splitCourtIntoTeams), choosing randomly among equally fresh splits
  */
 
 const pad2 = (value) => String(value).padStart(2, '0');
@@ -282,15 +283,6 @@ export default function VolleyballTeamRandomizer() {
     }
   }, [players.length, shouldFocusLast]);
 
-  const shuffleArray = (array) => {
-    const shuffled = [...array];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    return shuffled;
-  };
-
   const clearCurrentTeams = () => {
     setTeams([]);
   };
@@ -340,17 +332,11 @@ export default function VolleyballTeamRandomizer() {
     }
 
     const playingPlayers = assignments.flatMap(({ players: courtPlayers }) => courtPlayers);
-    const newTeams = assignments.map(({ court, mode, players: courtPlayers }) => {
-      const shuffledCourtPlayers = shuffleArray(courtPlayers);
-      const teamSize = courtPlayers.length / 2;
-
-      return {
-        court,
-        gameMode: mode,
-        team1: shuffledCourtPlayers.slice(0, teamSize),
-        team2: shuffledCourtPlayers.slice(teamSize)
-      };
-    });
+    const newTeams = assignments.map(({ court, mode, players: courtPlayers }) => ({
+      court,
+      gameMode: mode,
+      ...splitCourtIntoTeams({ players: courtPlayers, gameHistory })
+    }));
 
     const playingPlayerIds = new Set(playingPlayers.map((player) => player.id));
     const newSittingOut = validPlayers.filter((player) => !playingPlayerIds.has(player.id));
@@ -384,23 +370,12 @@ export default function VolleyballTeamRandomizer() {
       return;
     }
 
-    const idsOf = (team) => team.map((player) => player.id).sort().join(':');
-    const redealtTeams = teams.map((court) => {
-      const courtPlayers = [...court.team1, ...court.team2];
-      const teamSize = court.team1.length;
-      const previousSplit = new Set([idsOf(court.team1), idsOf(court.team2)]);
-      let shuffledPlayers = shuffleArray(courtPlayers);
-
-      for (let attempt = 0; attempt < 12 && previousSplit.has(idsOf(shuffledPlayers.slice(0, teamSize))); attempt += 1) {
-        shuffledPlayers = shuffleArray(courtPlayers);
-      }
-
-      return {
-        ...court,
-        team1: shuffledPlayers.slice(0, teamSize),
-        team2: shuffledPlayers.slice(teamSize)
-      };
-    });
+    // History still ends with the game being re-dealt, so its current teams
+    // count as "last game" and the new split avoids those partners too.
+    const redealtTeams = teams.map((court) => ({
+      ...court,
+      ...splitCourtIntoTeams({ players: [...court.team1, ...court.team2], gameHistory })
+    }));
 
     setTeams(redealtTeams);
     setGameHistory((previousGames) => previousGames.map((game, index) => (

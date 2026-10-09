@@ -34,7 +34,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 ### Key Algorithms
 - **Fair Rotation System**: Players who were eligible and sat out the previous game are prioritized for the next round. Other eligible players are then selected using sit-out, play-count, and preference-flexibility statistics, with a randomized tie-breaker.
-- **Team Generation**: Fisher-Yates shuffle algorithm for randomizing team assignments
+- **Team Generation**: `splitCourtIntoTeams` scores every possible split of a court and picks the one repeating the fewest recent partnerships (never last game's partner when avoidable), with a random tie-breaker
 - **Multi-Court Support**: Configure 1-4 courts with independent 2v2/3v3/4v4 modes
 
 ### Technical Architecture
