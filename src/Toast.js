@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { AlertCircle, CheckCircle, Info, X } from 'lucide-react';
 
 const TOAST_DURATION = 4000; // 4 seconds
+const ACTION_TOAST_DURATION = 6000; // longer, so there is time to hit Undo
 
 const TOAST_TYPES = {
   success: CheckCircle,
@@ -9,7 +10,7 @@ const TOAST_TYPES = {
   info: Info
 };
 
-export function Toast({ id, message, type = 'info', onDismiss }) {
+export function Toast({ id, message, type = 'info', action, onDismiss }) {
   const [isExiting, setIsExiting] = useState(false);
   const IconComponent = TOAST_TYPES[type] || TOAST_TYPES.info;
 
@@ -17,10 +18,10 @@ export function Toast({ id, message, type = 'info', onDismiss }) {
     const timer = setTimeout(() => {
       setIsExiting(true);
       setTimeout(() => onDismiss(id), 300);
-    }, TOAST_DURATION);
+    }, action ? ACTION_TOAST_DURATION : TOAST_DURATION);
 
     return () => clearTimeout(timer);
-  }, [id, onDismiss]);
+  }, [id, action, onDismiss]);
 
   const handleDismiss = () => {
     setIsExiting(true);
@@ -34,6 +35,18 @@ export function Toast({ id, message, type = 'info', onDismiss }) {
     >
       <IconComponent className="toast-icon h-5 w-5" />
       <p className="toast-message">{message}</p>
+      {action && (
+        <button
+          type="button"
+          className="toast-action"
+          onClick={() => {
+            action.onClick();
+            handleDismiss();
+          }}
+        >
+          {action.label}
+        </button>
+      )}
       <button
         onClick={handleDismiss}
         className="toast-dismiss"

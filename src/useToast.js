@@ -9,9 +9,9 @@ let toastId = 0;
 export function useToast() {
   const [toasts, setToasts] = useState([]);
 
-  const show = useCallback((message, type = 'info') => {
+  const show = useCallback((message, type = 'info', action) => {
     const id = toastId++;
-    const toast = { id, message, type };
+    const toast = { id, message, type, action };
     
     setToasts((prevToasts) => [...prevToasts, toast]);
     
@@ -24,10 +24,12 @@ export function useToast() {
 
   const success = useCallback((message) => show(message, 'success'), [show]);
   const error = useCallback((message) => show(message, 'error'), [show]);
+  const info = useCallback((message, action) => show(message, 'info', action), [show]);
   return {
     toasts,
     dismiss,
     success,
-    error
+    error,
+    info
   };
 }
