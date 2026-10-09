@@ -14,8 +14,9 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 
 @CapacitorPlugin(name = "NativeTheme")
 public class NativeThemePlugin extends Plugin {
-    private static final int DARK_SYSTEM_BAR_COLOR = Color.rgb(7, 24, 39);
-    private static final int LIGHT_SYSTEM_BAR_COLOR = Color.rgb(248, 250, 252);
+    // Match the web canvas tokens in src/index.css (--canvas, light and dark).
+    private static final int DARK_SYSTEM_BAR_COLOR = Color.rgb(12, 26, 36);
+    private static final int LIGHT_SYSTEM_BAR_COLOR = Color.rgb(244, 233, 212);
 
     @PluginMethod
     public void setTheme(PluginCall call) {

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, Minus, Monitor, Moon, Plus, RotateCcw, Sun, Trash2 } from 'lucide-react';
-import heroEmoji from './assets/hero-emoji.png';
+import { Monitor, Moon, Plus, RotateCcw, Shuffle, Sun, Trash2, X } from 'lucide-react';
+import { BallMark, Court, MODE_NAMES } from './CourtDiagram';
 import { ToastContainer } from './Toast';
 import { useToast } from './useToast';
 import {
@@ -14,15 +14,12 @@ import {
   GAME_MODES,
   MAX_COURTS,
   DEFAULT_COURT_MODES,
-  ALL_MODE_PREFERENCE,
   getPlayersPerCourt,
-  getGameModeDescription,
   getPlayerName,
   normalizePreferredModes,
   createPlayer,
   isPlayerEligibleForMode,
   canPlayerPlaySelectedModes,
-  hasAnyModePreference,
   getPreferenceLabel,
   getTeamGroupStats,
   allocateFairRound
@@ -58,6 +55,8 @@ import {
  */
 
 const pad2 = (value) => String(value).padStart(2, '0');
+const THEME_COLORS = { light: '#f4e9d4', dark: '#0c1a24' };
+const THEME_ICONS = { light: Sun, dark: Moon, system: Monitor };
 
 export default function VolleyballTeamRandomizer() {
   const [players, setPlayers] = useState([createPlayer()]);
@@ -69,10 +68,15 @@ export default function VolleyballTeamRandomizer() {
   const [theme, setTheme] = useState('system');
   const [isHydrated, setIsHydrated] = useState(false);
   const [isStartOverOpen, setIsStartOverOpen] = useState(false);
+  const [tossCount, setTossCount] = useState(0);
+  const [announcement, setAnnouncement] = useState('');
   const inputRefs = useRef([]);
+  const stageRef = useRef(null);
+  const stageHeadingRef = useRef(null);
+  const revealPendingRef = useRef(false);
   const storageErrorShownRef = useRef(false);
   const [shouldFocusLast, setShouldFocusLast] = useState(false);
-  const { toasts, dismiss, success, error } = useToast();
+  const { toasts, dismiss, success, error, info } = useToast();
 
   useEffect(() => {
     let isMounted = true;
@@ -129,7 +133,7 @@ export default function VolleyballTeamRandomizer() {
       applyNativeTheme(resolvedTheme).catch(() => undefined);
 
       const themeColor = document.querySelector('meta[name="theme-color"]');
-      themeColor?.setAttribute('content', resolvedTheme === 'dark' ? '#070d16' : '#f6f1e3');
+      themeColor?.setAttribute('content', THEME_COLORS[resolvedTheme]);
     };
 
     syncTheme();
@@ -186,7 +190,7 @@ export default function VolleyballTeamRandomizer() {
 
     return [
       ...messages,
-      `Need ${shortage} more ${mode}-eligible ${shortage === 1 ? 'player' : 'players'}`
+      `Need ${shortage} more ${shortage === 1 ? 'player' : 'players'} for ${MODE_NAMES[mode]} (${mode})`
     ];
   }, []);
   const shortageMessage = shortageMessages.length > 0 ? `${shortageMessages.join(' and ')}.` : '';
@@ -207,7 +211,23 @@ export default function VolleyballTeamRandomizer() {
   };
 
   const removePlayer = (index) => {
+    const removedPlayer = players[index];
     setPlayers((currentPlayers) => currentPlayers.filter((_, i) => i !== index));
+
+    if (getPlayerName(removedPlayer)) {
+      info(`Removed ${getPlayerName(removedPlayer)}.`, {
+        label: 'Undo',
+        onClick: () => setPlayers((currentPlayers) => {
+          if (currentPlayers.some((player) => player.id === removedPlayer.id)) {
+            return currentPlayers;
+          }
+
+          const restoredPlayers = [...currentPlayers];
+          restoredPlayers.splice(Math.min(index, restoredPlayers.length), 0, removedPlayer);
+          return restoredPlayers;
+        })
+      });
+    }
   };
 
   const updatePlayer = (index, name) => {
@@ -229,17 +249,14 @@ export default function VolleyballTeamRandomizer() {
       }
 
       const currentPreferredModes = normalizePreferredModes(player.preferredModes);
-
-      if (preference === ALL_MODE_PREFERENCE) {
-        return {
-          ...player,
-          preferredModes: [...GAME_MODES]
-        };
-      }
-
       const nextPreferredModes = currentPreferredModes.includes(preference)
         ? currentPreferredModes.filter((mode) => mode !== preference)
         : [...currentPreferredModes, preference];
+
+      // Every player keeps at least one format; tapping the last one is a no-op.
+      if (nextPreferredModes.length === 0) {
+        return player;
+      }
 
       return {
         ...player,
@@ -352,15 +369,66 @@ export default function VolleyballTeamRandomizer() {
     setTeams(newTeams);
     setSittingOut(newSittingOut);
     setGameHistory((previousGames) => [...previousGames, newGame]);
-    success(`Game ${newGame.gameNumber} generated successfully!`);
+    setTossCount((count) => count + 1);
+    revealPendingRef.current = true;
+    // The reveal itself is the visual feedback; screen readers get the summary.
+    setAnnouncement(`Game ${newGame.gameNumber} is set. ${newSittingOut.length > 0
+      ? `Bench: ${newSittingOut.map(getPlayerName).join(', ')}.`
+      : 'Everyone is playing.'}`);
   };
+
+  // Lopsided teams? Re-deal partners within each court. Same players, same
+  // bench, same game number, so the rotation and sit-out history are untouched.
+  const redealTeams = () => {
+    if (teams.length === 0) {
+      return;
+    }
+
+    const idsOf = (team) => team.map((player) => player.id).sort().join(':');
+    const redealtTeams = teams.map((court) => {
+      const courtPlayers = [...court.team1, ...court.team2];
+      const teamSize = court.team1.length;
+      const previousSplit = new Set([idsOf(court.team1), idsOf(court.team2)]);
+      let shuffledPlayers = shuffleArray(courtPlayers);
+
+      for (let attempt = 0; attempt < 12 && previousSplit.has(idsOf(shuffledPlayers.slice(0, teamSize))); attempt += 1) {
+        shuffledPlayers = shuffleArray(courtPlayers);
+      }
+
+      return {
+        ...court,
+        team1: shuffledPlayers.slice(0, teamSize),
+        team2: shuffledPlayers.slice(teamSize)
+      };
+    });
+
+    setTeams(redealtTeams);
+    setGameHistory((previousGames) => previousGames.map((game, index) => (
+      index === previousGames.length - 1 ? { ...game, teams: redealtTeams } : game
+    )));
+    setTossCount((count) => count + 1);
+    setAnnouncement(`Game ${gameHistory.length} re-dealt. Same players on each court, new teams.`);
+  };
+
+  // Bring the freshly dealt courts to the player instead of leaving them off-screen.
+  useEffect(() => {
+    if (!revealPendingRef.current || teams.length === 0) {
+      return;
+    }
+
+    revealPendingRef.current = false;
+    // Jump, don't glide: the deal-in animation is the motion, and an instant
+    // scroll can't be cancelled by focus changes or throttled frames.
+    stageRef.current?.scrollIntoView?.({ block: 'start' });
+    stageHeadingRef.current?.focus({ preventScroll: true });
+  }, [teams]);
 
   const reset = () => {
     const resetSession = createRoundResetSession({ players, courts, courtModes, theme });
     setTeams(resetSession.teams);
     setSittingOut(resetSession.sittingOut);
     setGameHistory(resetSession.gameHistory);
-    success('All games reset successfully!');
+    success('Rounds cleared. Roster and courts kept.');
   };
 
   const startOver = () => {
@@ -387,31 +455,333 @@ export default function VolleyballTeamRandomizer() {
   const renderNames = (playerList) => playerList.map(getPlayerName).join(', ');
   const renderTeamGroup = (players) => players.map(getPlayerName).join(' + ');
   const teamGroupStats = useMemo(() => getTeamGroupStats(gameHistory), [gameHistory]);
-  const teamGroupSizes = new Set(teamGroupStats.map((teamGroup) => teamGroup.players.length));
-  const teamGroupHistoryTitle = teamGroupSizes.size === 1 && teamGroupSizes.has(2)
-    ? 'Teammate Pair History'
-    : 'Teammate Group History';
-  const selectedCourtSummary = activeCourtModes
-    .map((mode, index) => `Court ${index + 1}: ${mode}`)
-    .join(' | ');
+  const repeatTeamGroups = teamGroupStats.filter((teamGroup) => teamGroup.count > 1);
+  const hasTeams = teams.length > 0;
+  const stageGameNumber = hasTeams ? gameHistory.length : gameHistory.length + 1;
+  const benchCount = Math.max(0, totalPlayers - totalSpotsRequired);
+  const missingPlayers = Math.max(0, totalSpotsRequired - totalPlayers);
+  const formatsLimitPlayers = validPlayers.some((player) => (
+    activeCourtModes.some((mode) => !isPlayerEligibleForMode(player, mode))
+  ));
+  const readiness = !isHydrated
+    ? { tone: 'muted', text: 'Loading your session…' }
+    : missingPlayers > 0 && !formatsLimitPlayers
+      ? { tone: 'warn', text: `Add ${missingPlayers} more ${missingPlayers === 1 ? 'player' : 'players'} to fill ${courts === 1 ? 'the court' : 'every court'}.` }
+      : shortageMessage
+        ? { tone: 'warn', text: shortageMessage }
+        : { tone: 'ok', text: `${totalSpotsRequired} play · ${benchCount} sit out` };
+  const benchIsGuaranteed = sittingOut.every((player) => canPlayerPlaySelectedModes(player, activeCourtModes));
 
   return (
-    <div className="beach-app min-h-screen p-3 sm:p-6 lg:p-10">
-      <main aria-busy={!isHydrated} className="app-shell mx-auto max-w-5xl">
-        <header className="scoreboard">
-          <div className="scoreboard-top">
-            <div className="wordmark">
-              <img className="wordmark-mark" src={heroEmoji} alt="" aria-hidden="true" />
-              <span className="wordmark-text">
-                <span className="wordmark-eyebrow">Beach Volleyball</span>
-                <span className="wordmark-title">Team Randomizer</span>
+    <div className={`beach-app ${gameHistory.length > 0 ? 'has-history' : ''}`}>
+      <header className="topbar">
+        <h1 className="brand">
+          <BallMark className="brand-mark" />
+          <span className="brand-text">
+            <span className="brand-kicker">Beach Volleyball</span>
+            <span className="brand-name">Team Randomizer</span>
+          </span>
+        </h1>
+
+      </header>
+
+      <main aria-busy={!isHydrated} className="layout">
+        {/* Sideline: everything you set before the serve */}
+        <div className="sideline">
+          <section className="panel" aria-labelledby="courts-title">
+            <div className="panel-head">
+              <h2 id="courts-title" className="panel-title">Courts</h2>
+              <span className="panel-count">{courts} of {MAX_COURTS}</span>
+            </div>
+
+            <ol className="court-setup">
+              {activeCourtModes.map((mode, courtIndex) => (
+                <li key={courtIndex} className="court-setup-row">
+                  <span className="court-setup-no" aria-hidden="true">{courtIndex + 1}</span>
+                  <div className="segmented" role="group" aria-label={`Court ${courtIndex + 1} format`}>
+                    {GAME_MODES.map((availableMode) => (
+                      <button
+                        key={availableMode}
+                        type="button"
+                        onClick={() => handleCourtModeChange(courtIndex, availableMode)}
+                        className="segment"
+                        aria-pressed={mode === availableMode}
+                        aria-label={`${MODE_NAMES[availableMode]} (${availableMode})`}
+                      >
+                        <span className="segment-name">{MODE_NAMES[availableMode]}</span>
+                        <span className="segment-mode">{availableMode}</span>
+                      </button>
+                    ))}
+                  </div>
+                </li>
+              ))}
+            </ol>
+
+            <div className="court-count-actions">
+              <button
+                type="button"
+                onClick={() => updateCourts(courts + 1)}
+                disabled={courts >= MAX_COURTS}
+                className="text-btn"
+                aria-label="Add court"
+              >
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                Add court
+              </button>
+              {courts > 1 && (
+                <button
+                  type="button"
+                  onClick={() => updateCourts(courts - 1)}
+                  className="text-btn text-btn-quiet"
+                  aria-label="Remove court"
+                >
+                  Remove court {courts}
+                </button>
+              )}
+            </div>
+          </section>
+
+          <section className="panel" aria-labelledby="roster-title">
+            <div className="panel-head">
+              <h2 id="roster-title" className="panel-title">Roster</h2>
+              <span className="panel-count">{totalPlayers} {totalPlayers === 1 ? 'player' : 'players'}</span>
+            </div>
+            <p className="panel-hint">Tap a format to rule a player out of it.</p>
+
+            <ol className="roster">
+              {players.map((player, index) => {
+                const playerLabel = getPlayerName(player) || `Player ${index + 1}`;
+                const preferredModes = normalizePreferredModes(player.preferredModes);
+
+                return (
+                  <li key={player.id} className="roster-row">
+                    <span className="roster-no" aria-hidden="true">{pad2(index + 1)}</span>
+                    <input
+                      ref={(el) => {
+                        inputRefs.current[index] = el;
+                      }}
+                      type="text"
+                      placeholder={`Player ${index + 1}`}
+                      aria-label={`Player ${index + 1} name`}
+                      value={player.name}
+                      onChange={(e) => updatePlayer(index, e.target.value)}
+                      onKeyDown={(e) => handlePlayerKeyDown(e, index)}
+                      className="player-input"
+                      autoComplete="off"
+                      autoCapitalize="words"
+                      enterKeyHint="next"
+                    />
+                    <div className="format-toggles" role="group" aria-label={`${playerLabel} plays`}>
+                      {GAME_MODES.map((mode) => {
+                        const isSelected = isPlayerEligibleForMode(player, mode);
+                        const isLastSelected = isSelected && preferredModes.length === 1;
+
+                        return (
+                          <button
+                            key={mode}
+                            type="button"
+                            onClick={() => updatePlayerPreferredModes(index, mode)}
+                            className="format-toggle"
+                            aria-pressed={isSelected}
+                            aria-label={`${MODE_NAMES[mode]} (${mode})`}
+                            title={isLastSelected
+                              ? `${playerLabel} needs at least one format`
+                              : `${playerLabel}: ${getPreferenceLabel(player)}`}
+                          >
+                            {mode}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {players.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removePlayer(index)}
+                        className="remove-btn"
+                        aria-label={`Remove ${playerLabel}`}
+                      >
+                        <X className="h-4 w-4" aria-hidden="true" />
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+
+            <button type="button" onClick={addPlayer} className="text-btn add-player">
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Add player
+            </button>
+          </section>
+
+          {/* Serve bar: fixed to the thumb zone on phones, sticky in the sideline on desktop */}
+          <div className="serve-bar">
+            <p className={`serve-status serve-status-${readiness.tone}`} aria-live="polite">
+              {readiness.text}
+            </p>
+            <button
+              type="button"
+              onClick={generateTeams}
+              disabled={!isHydrated || !canGenerateTeams}
+              className="serve-btn"
+            >
+              <BallMark key={tossCount} className={tossCount > 0 ? 'is-tossed' : ''} />
+              {gameHistory.length === 0 ? 'Shuffle teams' : `Shuffle game ${gameHistory.length + 1}`}
+            </button>
+          </div>
+        </div>
+
+        {/* Stage: the courts as they'll be played */}
+        <div className="stage" ref={stageRef}>
+          <section aria-labelledby="stage-title">
+            <div className="stage-head">
+              <h2
+                id="stage-title"
+                ref={stageHeadingRef}
+                tabIndex={-1}
+                className="stage-title"
+                aria-label={`Game ${stageGameNumber}, ${hasTeams ? 'on court' : 'up next'}`}
+              >
+                <span className="stage-label">Game</span> {pad2(stageGameNumber)}
+              </h2>
+              <span className={`stage-state ${hasTeams ? 'is-live' : ''}`}>
+                {hasTeams ? 'On court' : 'Up next'}
               </span>
             </div>
 
-            <div className="theme-switcher" role="group" aria-label="Color theme">
-              {THEME_OPTIONS.map((themeOption) => {
-                const ThemeIcon = themeOption === 'light' ? Sun : themeOption === 'dark' ? Moon : Monitor;
+            {!hasTeams && guaranteedWaitingPlayers.length > 0 && (
+              <div className="callout callout-good">
+                <span className="callout-label">First call</span>
+                <p className="callout-names">{renderNames(guaranteedWaitingPlayers)}</p>
+                <p className="callout-note">Sat out last game, so they're in this one.</p>
+              </div>
+            )}
 
+            {!hasTeams && ineligibleWaitingPlayers.length > 0 && (
+              <div className="callout callout-bad">
+                <span className="callout-label">Can't get first call</span>
+                <p className="callout-names">
+                  {ineligibleWaitingPlayers.map((player) => `${getPlayerName(player)} (${getPreferenceLabel(player)})`).join(', ')}
+                </p>
+                <p className="callout-note">No court is set to a format they play. Change a court or their formats first.</p>
+              </div>
+            )}
+
+            <div className="court-grid">
+              {hasTeams
+                ? teams.map((court) => (
+                  <Court key={`${gameHistory.length}-${court.court}`} court={court} />
+                ))
+                : activeCourtModes.map((mode, index) => (
+                  <Court key={`preview-${index}`} mode={mode} number={index + 1} />
+                ))}
+            </div>
+
+            {hasTeams && (
+              <div className="redeal">
+                <button type="button" onClick={redealTeams} className="text-btn">
+                  <Shuffle className="h-4 w-4" aria-hidden="true" />
+                  Re-deal teams
+                </button>
+                <p>Same players on each court, new partners. Doesn't count as a game.</p>
+              </div>
+            )}
+
+            {hasTeams && sittingOut.length > 0 && (
+              <div className={`bench ${benchIsGuaranteed ? '' : 'bench-warn'}`}>
+                <span className="bench-label">Bench · {sittingOut.length}</span>
+                <p className="bench-names">{renderNames(sittingOut)}</p>
+                <p className="bench-note">
+                  {benchIsGuaranteed
+                    ? 'First on court next game.'
+                    : 'Only guaranteed next game if a court is set to a format they play.'}
+                </p>
+              </div>
+            )}
+
+            {!hasTeams && gameHistory.length === 0 && (
+              <p className="stage-hint">
+                Fill the roster and shuffle. Whoever sits out gets first call next game, so the rotation stays fair all session.
+              </p>
+            )}
+
+            {gameHistory.length > 0 && (
+              <details className="how-fair">
+                <summary>How the rotation stays fair</summary>
+                <p>
+                  Players who sat out last game are picked first, then anyone who has sat out more often, then everyone else at random. Formats are hard rules: nobody is put on a court they ruled out.
+                </p>
+              </details>
+            )}
+          </section>
+
+          {gameHistory.length > 0 && (
+            <section className="game-history-panel" aria-labelledby="history-title">
+              <div className="log-head">
+                <h3 id="history-title">Game History</h3>
+                <span className="log-count">{gameHistory.length} {gameHistory.length === 1 ? 'round' : 'rounds'}</span>
+              </div>
+
+              <ol className="log-list" reversed>
+                {[...gameHistory].reverse().map((game) => (
+                  <li key={`${game.gameNumber}-${game.createdAt || ''}`} className="history-game-card">
+                    <span className="log-round">Game {game.gameNumber}</span>
+                    <div className="log-body">
+                      {(game.teams || []).map((court) => (
+                        <div key={court.court} className="log-court">
+                          <span className="log-court-no">C{court.court}</span>
+                          <span className="log-teams">
+                            <span className="log-team log-team-a">{renderTeamGroup(court.team1)}</span>
+                            <span className="sr-only">versus</span>
+                            <span className="log-team log-team-b">{renderTeamGroup(court.team2)}</span>
+                          </span>
+                        </div>
+                      ))}
+                      {(game.teams || []).length === 0 && game.playing.length > 0 && (
+                        <p className="log-court">{renderNames(game.playing)}</p>
+                      )}
+                      {game.sittingOut.length > 0 && (
+                        <p className="log-bench">Bench: {renderNames(game.sittingOut)}</p>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+
+              {teamGroupStats.length > 0 && (
+                <div className="history-summary-card">
+                  <h4>Repeat partners</h4>
+                  {repeatTeamGroups.length === 0 && (
+                    <p className="pair-empty">None yet. Every team so far has been a new combination.</p>
+                  )}
+                  <ul className="pair-list">
+                    {repeatTeamGroups.map((teamGroup) => (
+                      <li key={teamGroup.key} className="history-pair-row">
+                        <span className="pair-names">{renderTeamGroup(teamGroup.players)}</span>
+                        <span
+                          className="pair-count"
+                          title={`Games ${teamGroup.games.join(', ')}`}
+                          aria-label={`${teamGroup.count} ${teamGroup.count === 1 ? 'game' : 'games'} together`}
+                        >
+                          ×{teamGroup.count}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </section>
+          )}
+        </div>
+
+        <footer className="session-footer">
+          <h2 className="session-title">Session</h2>
+          <div className="session-display">
+            <span id="theme-label">Display</span>
+            <div className="theme-switcher" role="group" aria-labelledby="theme-label">
+              {THEME_OPTIONS.map((themeOption) => {
+                const ThemeIcon = THEME_ICONS[themeOption];
+  
                 return (
                   <button
                     key={themeOption}
@@ -422,390 +792,34 @@ export default function VolleyballTeamRandomizer() {
                     title={`${themeOption[0].toUpperCase()}${themeOption.slice(1)} theme`}
                     onClick={() => setTheme(themeOption)}
                   >
-                    <ThemeIcon className="h-3.5 w-3.5" />
-                    <span>{themeOption}</span>
+                    <ThemeIcon className="h-4 w-4" aria-hidden="true" />
                   </button>
                 );
               })}
             </div>
           </div>
-
-          <div className="scoreboard-tagline">
-            <h1 className="tagline">
-              Rally. Rotate.<br /><span className="tagline-accent">Play fair.</span>
-            </h1>
-            <p className="tagline-sub">
-              Fair, random courts in one tap — 2v2, 3v3 or 4v4 across up to four courts. Players who sit out get priority next round.
-            </p>
-          </div>
-
-          <div className="ticker" aria-label="Session stats">
-            <div className="ticker-cell">
-              <span className="ticker-value">{pad2(courts)}</span>
-              <span className="ticker-label">Courts</span>
-            </div>
-            <div className="ticker-cell">
-              <span className="ticker-value">{pad2(totalPlayers)}</span>
-              <span className="ticker-label">Players</span>
-            </div>
-            <div className="ticker-cell">
-              <span className="ticker-value">{pad2(gameHistory.length)}</span>
-              <span className="ticker-label">Rounds</span>
-            </div>
-          </div>
-        </header>
-
-        <div className="p-5 sm:p-8 lg:p-9">
-          {/* 01 — Court setup */}
-          <section className="section">
-            <div className="section-head">
-              <span className="section-no">01</span>
-              <div>
-                <h2 className="section-title">Set the courts</h2>
-                <p className="section-sub">Choose how many games run at once and the format for each.</p>
-              </div>
-            </div>
-
-            <div className="court-counter" role="group" aria-label="Court count">
-              <button
-                onClick={() => updateCourts(courts - 1)}
-                disabled={courts <= 1}
-                className="court-counter-btn"
-                aria-label="Remove court"
-              >
-                <Minus className="h-4 w-4" />
+          {gameHistory.length > 0 && (
+            <div className="session-action">
+              <button type="button" onClick={reset} className="text-btn">
+                <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                Reset rounds
               </button>
-              <span className="court-counter-value" aria-live="polite">{pad2(courts)}</span>
-              <button
-                onClick={() => updateCourts(courts + 1)}
-                disabled={courts >= MAX_COURTS}
-                className="court-counter-btn"
-                aria-label="Add court"
-              >
-                <Plus className="h-4 w-4" />
-              </button>
+              <p>Clears game history and the rotation. Keeps the roster and courts.</p>
             </div>
-
-            <div className="court-grid">
-              {activeCourtModes.map((mode, courtIndex) => (
-                <div key={courtIndex} className="court-card">
-                  <div className="court-card-head">
-                    <h3 className="court-name">Court {courtIndex + 1}</h3>
-                    <span className="court-tag">{getPlayersPerCourt(mode)} PLAYERS</span>
-                  </div>
-                  <div className="chip-row">
-                    {GAME_MODES.map((availableMode) => (
-                      <button
-                        key={availableMode}
-                        onClick={() => handleCourtModeChange(courtIndex, availableMode)}
-                        className="mode-chip"
-                        aria-pressed={mode === availableMode}
-                      >
-                        {availableMode}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="court-note">{getGameModeDescription(mode)}</p>
-                </div>
-              ))}
-            </div>
-
-            <p className="need-line">
-              <strong>{pad2(totalSpotsRequired)}</strong> players needed · {selectedCourtSummary}
-            </p>
-            {shortageMessage && (
-              <p className="need-warn">{shortageMessage}</p>
-            )}
-          </section>
-
-          {/* 02 — Lineup */}
-          <section className="section">
-            <div className="section-head">
-              <span className="section-no">02</span>
-              <div>
-                <h2 className="section-title">Build the lineup</h2>
-                <p className="section-sub">Add everyone playing and tap their preferred formats.</p>
-              </div>
-            </div>
-
-            <div className="space-y-2.5">
-              {players.map((player, index) => (
-                <div key={player.id} className="player-row">
-                  <input
-                    ref={(el) => {
-                      inputRefs.current[index] = el;
-                    }}
-                    type="text"
-                    placeholder={`Player ${index + 1} name`}
-                    value={player.name}
-                    onChange={(e) => updatePlayer(index, e.target.value)}
-                    onKeyDown={(e) => handlePlayerKeyDown(e, index)}
-                    className="player-input"
-                  />
-                  <div className="pref-chips" aria-label={`Player ${index + 1} mode preferences`}>
-                    {[ALL_MODE_PREFERENCE, ...GAME_MODES].map((preference) => {
-                      const isSelected = preference === ALL_MODE_PREFERENCE
-                        ? hasAnyModePreference(player)
-                        : isPlayerEligibleForMode(player, preference);
-
-                      return (
-                        <button
-                          key={preference}
-                          type="button"
-                          onClick={() => updatePlayerPreferredModes(index, preference)}
-                          className={`jersey-chip ${preference === ALL_MODE_PREFERENCE ? 'jersey-chip-any' : ''}`}
-                          aria-pressed={isSelected}
-                          title={`${getPlayerName(player) || `Player ${index + 1}`} preferences: ${getPreferenceLabel(player)}`}
-                        >
-                          {preference}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {players.length > 1 && (
-                    <button
-                      onClick={() => removePlayer(index)}
-                      className="remove-btn"
-                      aria-label={`Remove player ${index + 1}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <button onClick={addPlayer} className="add-player">
-              <Plus className="h-4 w-4" />
-              Add Player
-            </button>
-            <p className="roster-count">Total {pad2(totalPlayers)} players</p>
-          </section>
-
-          {/* Control deck */}
-          <div className="deck">
+          )}
+          <div className="session-action">
             <button
-              onClick={generateTeams}
-              disabled={!isHydrated || !canGenerateTeams}
-              className="deck-action deck-cta"
-            >
-              <span className="live-dot" aria-hidden="true" />
-              {gameHistory.length === 0 ? 'Generate Teams' : `Generate Game ${gameHistory.length + 1}`}
-              <ArrowRight className="h-5 w-5" />
-            </button>
-            {gameHistory.length > 0 && (
-              <button
-                onClick={reset}
-                className="deck-action deck-btn"
-              >
-                <RotateCcw className="h-4 w-4" />
-                Reset Rounds
-              </button>
-            )}
-            <button
+              type="button"
               onClick={() => setIsStartOverOpen(true)}
               disabled={!isHydrated}
-              className="deck-action deck-danger"
+              className="text-btn text-btn-danger"
             >
-              <Trash2 className="h-4 w-4" />
-              Start Over
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
+              Start over
             </button>
+            <p>Clears everything saved on this device.</p>
           </div>
-
-          {/* 03 — Matchups */}
-          <section className="section">
-            <div className="section-head">
-              <span className="section-no">03</span>
-              <div>
-                <h2 className="section-title">Live matchups</h2>
-                <p className="section-sub">
-                  {teams.length > 0 ? 'Fair courts, straight from the rotation.' : 'One tap away from the first serve.'}
-                </p>
-              </div>
-            </div>
-
-            {teams.length === 0 && (
-              <>
-                {guaranteedWaitingPlayers.length > 0 && (
-                  <div className="notice notice-good">
-                    <h3 className="notice-title">Guaranteed next game</h3>
-                    <div className="notice-pills">
-                      {guaranteedWaitingPlayers.map((player) => (
-                        <span key={player.id} className="pill">{getPlayerName(player)}</span>
-                      ))}
-                    </div>
-                    <p className="notice-note">
-                      These players sat out last game and will be prioritized for the next game.
-                    </p>
-                  </div>
-                )}
-
-                {ineligibleWaitingPlayers.length > 0 && (
-                  <div className="notice notice-bad">
-                    <h3 className="notice-title">Preferences prevent next-game priority</h3>
-                    <div className="notice-pills">
-                      {ineligibleWaitingPlayers.map((player) => (
-                        <span key={player.id} className="pill">
-                          {getPlayerName(player)} ({getPreferenceLabel(player)})
-                        </span>
-                      ))}
-                    </div>
-                    <p className="notice-note">
-                      None of the selected court modes match these players. Change a court mode or their preferences before generating.
-                    </p>
-                  </div>
-                )}
-
-                {gameHistory.length > 0 && (
-                  <div className="notice notice-info">
-                    <h3 className="notice-title">Fair rotation active</h3>
-                    <p className="notice-note">
-                      Priority order: <strong>1st</strong> players who sat out last game,{' '}
-                      <strong>2nd</strong> players who sat out before that,{' '}
-                      <strong>3rd</strong> everyone else randomly. Mode preferences are hard rules, so only eligible players are assigned to each court.
-                    </p>
-                  </div>
-                )}
-
-                <div className="ready-panel">
-                  <img className="ready-emoji" src={heroEmoji} alt="" aria-hidden="true" />
-                  <h3 className="ready-title">Waiting for the whistle</h3>
-                  <p className="ready-note">
-                    Set your courts, build the lineup, then hit Generate to drop the first matchups. Whoever sits out gets priority next round — the rotation stays fair all night.
-                  </p>
-                </div>
-              </>
-            )}
-
-            {teams.length > 0 && (
-              <>
-                <div className="match-grid">
-                  {teams.map((court) => (
-                    <section
-                      key={court.court}
-                      className="matchup-card"
-                      style={{ animationDelay: `${40 + court.court * 70}ms` }}
-                      aria-label={`Court ${court.court} ${court.gameMode || '2v2'} matchup`}
-                    >
-                      <header className="match-head">
-                        <span className="match-court">Court <em>{pad2(court.court)}</em></span>
-                        <span className="match-meta">{court.gameMode || '2v2'} · {getPlayersPerCourt(court.gameMode || '2v2')} ON</span>
-                      </header>
-
-                      <div className="team-block">
-                        <span className="team-label"><span className="team-jersey">A</span> Team A</span>
-                        <ul className="team-names">
-                          {court.team1.map((player) => (
-                            <li key={player.id}>{getPlayerName(player)}</li>
-                          ))}
-                        </ul>
-                      </div>
-
-                      <div className="net" role="separator" aria-label="net">
-                        <span className="net-antenna net-antenna-l" aria-hidden="true" />
-                        <span className="net-antenna net-antenna-r" aria-hidden="true" />
-                      </div>
-
-                      <div className="team-block">
-                        <span className="team-label"><span className="team-jersey">B</span> Team B</span>
-                        <ul className="team-names">
-                          {court.team2.map((player) => (
-                            <li key={player.id}>{getPlayerName(player)}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    </section>
-                  ))}
-                </div>
-
-                {sittingOut.length > 0 && (
-                  <div className="bench">
-                    <span className="bench-label">Sitting out this round · {sittingOut.length}</span>
-                    <div className="bench-list">
-                      {sittingOut.map((player) => (
-                        <span key={player.id} className="pill">{getPlayerName(player)}</span>
-                      ))}
-                    </div>
-                    <p className="bench-note">
-                      {sittingOut.every((player) => canPlayerPlaySelectedModes(player, activeCourtModes)) ? (
-                        <><strong>Guaranteed to play next game.</strong> They'll be prioritized when you generate the next round.</>
-                      ) : (
-                        <><strong>Preference check needed.</strong> A player is only guaranteed a spot when a selected court mode matches their preferences.</>
-                      )}
-                    </p>
-                  </div>
-                )}
-              </>
-            )}
-          </section>
-
-          {/* Game log */}
-          {gameHistory.length > 0 && (
-            <section className="section">
-              <div className="game-history-panel">
-                <div className="log-head">
-                  <h3>Game History</h3>
-                  <span className="log-count">{gameHistory.length} {gameHistory.length === 1 ? 'round' : 'rounds'}</span>
-                </div>
-
-                <div className="log-list">
-                  {gameHistory.map((game) => (
-                    <article key={`${game.gameNumber}-${game.createdAt || ''}`} className="history-game-card">
-                      <header className="log-row-top">
-                        <span className="log-round">Game {game.gameNumber}</span>
-                        <span className="log-meta">{game.playing.length} playing · {game.sittingOut.length} sitting out</span>
-                      </header>
-
-                      <div className="log-body">
-                        <div className="log-line">
-                          <span className="log-label">Playing</span>
-                          <span>{renderNames(game.playing)}</span>
-                        </div>
-
-                        {(game.teams || []).length > 0 && (
-                          <div className="log-line log-line-stack">
-                            <span className="log-label">Teams</span>
-                            <div className="log-courts">
-                              {game.teams.map((court) => (
-                                <div key={court.court} className="log-court">
-                                  <em>Court {court.court}</em>{' '}
-                                  <b>Team A</b> {renderNames(court.team1)} vs <b>Team B</b> {renderNames(court.team2)}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {game.sittingOut.length > 0 && (
-                          <div className="log-line">
-                            <span className="log-label">Sat out</span>
-                            <span>{renderNames(game.sittingOut)}</span>
-                          </div>
-                        )}
-                      </div>
-                    </article>
-                  ))}
-                </div>
-
-                {teamGroupStats.length > 0 && (
-                  <div className="history-summary-card">
-                    <h4>{teamGroupHistoryTitle}</h4>
-                    <div className="pair-grid">
-                      {teamGroupStats.map((teamGroup) => (
-                        <div key={teamGroup.key} className="history-pair-row">
-                          <span className="pair-names">{renderTeamGroup(teamGroup.players)}</span>
-                          <span className="pair-count">
-                            {teamGroup.count} {teamGroup.count === 1 ? 'game' : 'games'} · Games {teamGroup.games.join(', ')}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </section>
-          )}
-        </div>
+        </footer>
       </main>
 
       {isStartOverOpen && (
@@ -830,23 +844,26 @@ export default function VolleyballTeamRandomizer() {
             </p>
             <div className="modal-actions">
               <button
+                type="button"
+                autoFocus
                 onClick={() => setIsStartOverOpen(false)}
-                className="deck-action deck-btn modal-btn"
+                className="modal-btn"
               >
-                Keep Session
+                Keep session
               </button>
               <button
-                autoFocus
+                type="button"
                 onClick={startOver}
-                className="modal-danger"
+                className="modal-btn modal-danger"
               >
-                <Trash2 className="h-4 w-4" />
-                Clear Everything
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
+                Clear everything
               </button>
             </div>
           </section>
         </div>
       )}
+      <p className="sr-only" aria-live="polite">{announcement}</p>
       <ToastContainer toasts={toasts} onDismiss={dismiss} />
     </div>
   );
