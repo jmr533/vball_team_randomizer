@@ -3,7 +3,6 @@ import {
   SESSION_VERSION,
   createInitialSession,
   createRoundResetSession,
-  createAndroidSessionStore,
   createBrowserSessionStore,
   deserializeSession,
   normalizeStoredSession,
@@ -75,76 +74,6 @@ describe('session persistence', () => {
       players: session.players,
       theme: 'midnight'
     }).theme).toBe('system');
-  });
-
-  it('loads the saved value through the Preferences interface', async () => {
-    const session = createInitialSession();
-    session.players[0].name = 'Jordan';
-    const preferences = {
-      get: jest.fn().mockResolvedValue({ value: serializeSession(session) }),
-      set: jest.fn(),
-      remove: jest.fn()
-    };
-
-    const restored = await createAndroidSessionStore(preferences).load();
-
-    expect(preferences.get).toHaveBeenCalledWith({ key: SESSION_KEY });
-    expect(restored.players[0].name).toBe('Jordan');
-  });
-
-  it('serializes writes so older saves cannot finish after newer saves', async () => {
-    let releaseFirstWrite;
-    const events = [];
-    const preferences = {
-      get: jest.fn(),
-      remove: jest.fn(),
-      set: jest.fn(({ value }) => {
-        const playerName = JSON.parse(value).players[0].name;
-        events.push(`start-${playerName}`);
-
-        if (playerName === 'First') {
-          return new Promise((resolve) => {
-            releaseFirstWrite = () => {
-              events.push('end-First');
-              resolve();
-            };
-          });
-        }
-
-        events.push(`end-${playerName}`);
-        return Promise.resolve();
-      })
-    };
-    const store = createAndroidSessionStore(preferences);
-    const firstSession = createInitialSession();
-    firstSession.players[0].name = 'First';
-    const secondSession = createInitialSession();
-    secondSession.players[0].name = 'Second';
-
-    const firstSave = store.save(firstSession);
-    const secondSave = store.save(secondSession);
-    await Promise.resolve();
-    await Promise.resolve();
-
-    expect(events).toEqual(['start-First']);
-    releaseFirstWrite();
-    await Promise.all([firstSave, secondSave]);
-
-    expect(events).toEqual(['start-First', 'end-First', 'start-Second', 'end-Second']);
-  });
-
-  it('queues clearing after pending saves', async () => {
-    const events = [];
-    const preferences = {
-      get: jest.fn(),
-      set: jest.fn(async () => events.push('save')),
-      remove: jest.fn(async () => events.push('clear'))
-    };
-    const store = createAndroidSessionStore(preferences);
-
-    await Promise.all([store.save(createInitialSession()), store.clear()]);
-
-    expect(events).toEqual(['save', 'clear']);
   });
 
   it('uses localStorage through the browser adapter', async () => {

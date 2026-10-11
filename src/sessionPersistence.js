@@ -1,6 +1,6 @@
-import { createPlatformSessionStore } from './sessionStorage';
+import { createBrowserSessionStore } from './sessionStorage';
 
-// Backward-compatible public entry point for the shared session contract.
+// Public entry point for the session contract.
 export {
   SESSION_VERSION,
   createInitialSession,
@@ -9,12 +9,6 @@ export {
   normalizeSession as normalizeStoredSession,
   serializeSession
 } from './session';
-export {
-  SESSION_KEY,
-  createAndroidSessionStore,
-  createBrowserSessionStore,
-  createPlatformSessionStore,
-  isNativeRuntime
-} from './sessionStorage';
+export { SESSION_KEY, createBrowserSessionStore } from './sessionStorage';
 
-export const sessionStore = createPlatformSessionStore();
+export const sessionStore = createBrowserSessionStore();

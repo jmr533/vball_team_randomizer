@@ -2,8 +2,6 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import App from '../App';
 import { createInitialSession, serializeSession } from '../sessionPersistence';
 
-jest.mock('../nativeTheme', () => ({ applyNativeTheme: () => Promise.resolve() }));
-
 describe('theme UI', () => {
   beforeEach(() => {
     const query = {

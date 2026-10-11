@@ -9,7 +9,6 @@ import {
   sessionStore
 } from './sessionPersistence';
 import { applyTheme, resolveTheme, subscribeToSystemTheme, THEME_OPTIONS } from './theme';
-import { applyNativeTheme } from './nativeTheme';
 import {
   GAME_MODES,
   MAX_COURTS,
@@ -131,7 +130,6 @@ export default function VolleyballTeamRandomizer() {
     const syncTheme = () => {
       const resolvedTheme = resolveTheme(theme, window.matchMedia);
       applyTheme(resolvedTheme);
-      applyNativeTheme(resolvedTheme).catch(() => undefined);
 
       const themeColor = document.querySelector('meta[name="theme-color"]');
       themeColor?.setAttribute('content', THEME_COLORS[resolvedTheme]);
