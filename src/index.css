@@ -530,7 +530,6 @@ button:disabled { cursor: not-allowed; }
 }
 
 .serve-status-warn { color: var(--bar-warn); }
-.serve-status-muted { color: var(--bar-muted); }
 
 .serve-btn {
   display: flex;

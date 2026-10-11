@@ -1,7 +1,7 @@
 import { applyTheme, getSystemTheme, normalizeTheme, resolveTheme, subscribeToSystemTheme } from '../theme';
 
 describe('theme helpers', () => {
-  const matchMedia = (matches) => jest.fn().mockReturnValue({ matches });
+  const matchMedia = (matches) => vi.fn().mockReturnValue({ matches });
 
   it('normalizes supported themes', () => {
     expect(normalizeTheme('light')).toBe('light');
@@ -29,11 +29,11 @@ describe('theme helpers', () => {
   it('reacts to OS changes while System is selected', () => {
     let listener;
     const query = {
-      addEventListener: jest.fn((event, callback) => { listener = callback; }),
-      removeEventListener: jest.fn()
+      addEventListener: vi.fn((event, callback) => { listener = callback; }),
+      removeEventListener: vi.fn()
     };
-    const matchMedia = jest.fn().mockReturnValue(query);
-    const onChange = jest.fn();
+    const matchMedia = vi.fn().mockReturnValue(query);
+    const onChange = vi.fn();
 
     const unsubscribe = subscribeToSystemTheme(onChange, matchMedia);
     listener();

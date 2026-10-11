@@ -1,18 +1,14 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Monitor, Moon, Plus, RotateCcw, Shuffle, Sun, Trash2, X } from 'lucide-react';
 import { BallMark, Court, MODE_NAMES } from './CourtDiagram';
 import { ToastContainer } from './Toast';
 import { useToast } from './useToast';
-import {
-  createInitialSession,
-  createRoundResetSession,
-  sessionStore
-} from './sessionPersistence';
+import { createInitialSession, createRoundResetSession } from './session';
+import { sessionStore } from './sessionStorage';
 import { applyTheme, resolveTheme, subscribeToSystemTheme, THEME_OPTIONS } from './theme';
 import {
   GAME_MODES,
   MAX_COURTS,
-  DEFAULT_COURT_MODES,
   getPlayersPerCourt,
   getPlayerName,
   normalizePreferredModes,
@@ -58,15 +54,23 @@ const pad2 = (value) => String(value).padStart(2, '0');
 const THEME_COLORS = { light: '#f4e9d4', dark: '#0c1a24' };
 const THEME_ICONS = { light: Sun, dark: Moon, system: Monitor };
 
+const loadStoredSession = () => {
+  try {
+    return { session: sessionStore.load() ?? createInitialSession(), restoreFailed: false };
+  } catch {
+    return { session: createInitialSession(), restoreFailed: true };
+  }
+};
+
 export default function VolleyballTeamRandomizer() {
-  const [players, setPlayers] = useState([createPlayer()]);
-  const [courts, setCourts] = useState(1);
-  const [courtModes, setCourtModes] = useState(DEFAULT_COURT_MODES);
-  const [teams, setTeams] = useState([]);
-  const [sittingOut, setSittingOut] = useState([]);
-  const [gameHistory, setGameHistory] = useState([]);
-  const [theme, setTheme] = useState('system');
-  const [isHydrated, setIsHydrated] = useState(false);
+  const [restored] = useState(loadStoredSession);
+  const [players, setPlayers] = useState(restored.session.players);
+  const [courts, setCourts] = useState(restored.session.courts);
+  const [courtModes, setCourtModes] = useState(restored.session.courtModes);
+  const [teams, setTeams] = useState(restored.session.teams);
+  const [sittingOut, setSittingOut] = useState(restored.session.sittingOut);
+  const [gameHistory, setGameHistory] = useState(restored.session.gameHistory);
+  const [theme, setTheme] = useState(restored.session.theme);
   const [isStartOverOpen, setIsStartOverOpen] = useState(false);
   const [tossCount, setTossCount] = useState(0);
   const [announcement, setAnnouncement] = useState('');
@@ -78,53 +82,28 @@ export default function VolleyballTeamRandomizer() {
   const [shouldFocusLast, setShouldFocusLast] = useState(false);
   const { toasts, dismiss, success, error, info } = useToast();
 
-  useEffect(() => {
-    let isMounted = true;
-
-    sessionStore.load()
-      .then((storedSession) => {
-        if (!isMounted || !storedSession) {
-          return;
-        }
-
-        setPlayers(storedSession.players);
-        setCourts(storedSession.courts);
-        setCourtModes(storedSession.courtModes);
-        setTeams(storedSession.teams);
-        setSittingOut(storedSession.sittingOut);
-        setGameHistory(storedSession.gameHistory);
-        setTheme(storedSession.theme);
-      })
-      .catch(() => {
-        if (isMounted) {
-          storageErrorShownRef.current = true;
-          error('Saved session could not be restored. Starting fresh.');
-        }
-      })
-      .finally(() => {
-        if (isMounted) {
-          setIsHydrated(true);
-        }
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [error]);
-
-  useEffect(() => {
-    if (!isHydrated) {
+  const reportStorageError = useCallback((message) => {
+    if (storageErrorShownRef.current) {
       return;
     }
 
-    sessionStore.save({ players, courts, courtModes, teams, sittingOut, gameHistory, theme })
-      .catch(() => {
-        if (!storageErrorShownRef.current) {
-          storageErrorShownRef.current = true;
-          error('Changes could not be saved on this device.');
-        }
-      });
-  }, [players, courts, courtModes, teams, sittingOut, gameHistory, theme, isHydrated, error]);
+    storageErrorShownRef.current = true;
+    error(message);
+  }, [error]);
+
+  useEffect(() => {
+    if (restored.restoreFailed) {
+      reportStorageError('Saved session could not be restored. Starting fresh.');
+    }
+  }, [restored, reportStorageError]);
+
+  useEffect(() => {
+    try {
+      sessionStore.save({ players, courts, courtModes, teams, sittingOut, gameHistory, theme });
+    } catch {
+      reportStorageError('Changes could not be saved on this device.');
+    }
+  }, [players, courts, courtModes, teams, sittingOut, gameHistory, theme, reportStorageError]);
 
   useEffect(() => {
     const syncTheme = () => {
@@ -407,12 +386,11 @@ export default function VolleyballTeamRandomizer() {
   const startOver = () => {
     const initialSession = createInitialSession();
 
-    sessionStore.clear().catch(() => {
-      if (!storageErrorShownRef.current) {
-        storageErrorShownRef.current = true;
-        error('Saved session could not be cleared from this device.');
-      }
-    });
+    try {
+      sessionStore.clear();
+    } catch {
+      reportStorageError('Saved session could not be cleared from this device.');
+    }
     setPlayers(initialSession.players);
     setCourts(initialSession.courts);
     setCourtModes(initialSession.courtModes);
@@ -436,13 +414,11 @@ export default function VolleyballTeamRandomizer() {
   const formatsLimitPlayers = validPlayers.some((player) => (
     activeCourtModes.some((mode) => !isPlayerEligibleForMode(player, mode))
   ));
-  const readiness = !isHydrated
-    ? { tone: 'muted', text: 'Loading your session…' }
-    : missingPlayers > 0 && !formatsLimitPlayers
-      ? { tone: 'warn', text: `Add ${missingPlayers} more ${missingPlayers === 1 ? 'player' : 'players'} to fill ${courts === 1 ? 'the court' : 'every court'}.` }
-      : shortageMessage
-        ? { tone: 'warn', text: shortageMessage }
-        : { tone: 'ok', text: `${totalSpotsRequired} play · ${benchCount} sit out` };
+  const readiness = missingPlayers > 0 && !formatsLimitPlayers
+    ? { tone: 'warn', text: `Add ${missingPlayers} more ${missingPlayers === 1 ? 'player' : 'players'} to fill ${courts === 1 ? 'the court' : 'every court'}.` }
+    : shortageMessage
+      ? { tone: 'warn', text: shortageMessage }
+      : { tone: 'ok', text: `${totalSpotsRequired} play · ${benchCount} sit out` };
   const benchIsGuaranteed = sittingOut.every((player) => canPlayerPlaySelectedModes(player, activeCourtModes));
 
   return (
@@ -458,7 +434,7 @@ export default function VolleyballTeamRandomizer() {
 
       </header>
 
-      <main aria-busy={!isHydrated} className="layout">
+      <main className="layout">
         {/* Sideline: everything you set before the serve */}
         <div className="sideline">
           <section className="panel" aria-labelledby="courts-title">
@@ -595,7 +571,7 @@ export default function VolleyballTeamRandomizer() {
             <button
               type="button"
               onClick={generateTeams}
-              disabled={!isHydrated || !canGenerateTeams}
+              disabled={!canGenerateTeams}
               className="serve-btn"
             >
               <BallMark key={tossCount} className={tossCount > 0 ? 'is-tossed' : ''} />
@@ -784,7 +760,6 @@ export default function VolleyballTeamRandomizer() {
             <button
               type="button"
               onClick={() => setIsStartOverOpen(true)}
-              disabled={!isHydrated}
               className="text-btn text-btn-danger"
             >
               <Trash2 className="h-4 w-4" aria-hidden="true" />
