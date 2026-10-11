@@ -1,13 +1,12 @@
 import {
-  SESSION_KEY,
   SESSION_VERSION,
   createInitialSession,
   createRoundResetSession,
-  createBrowserSessionStore,
   deserializeSession,
-  normalizeStoredSession,
+  normalizeSession,
   serializeSession
-} from '../sessionPersistence';
+} from '../session';
+import { SESSION_KEY, createBrowserSessionStore } from '../sessionStorage';
 
 describe('session persistence', () => {
   it('round-trips and normalizes a stored session', () => {
@@ -27,12 +26,12 @@ describe('session persistence', () => {
   it('rejects corrupt and incompatible stored values', () => {
     expect(deserializeSession('{broken')).toBeNull();
     expect(deserializeSession('')).toBeNull();
-    expect(normalizeStoredSession({ version: SESSION_VERSION + 1 })).toBeNull();
-    expect(normalizeStoredSession(null)).toBeNull();
+    expect(normalizeSession({ version: SESSION_VERSION + 1 })).toBeNull();
+    expect(normalizeSession(null)).toBeNull();
   });
 
   it('replaces an invalid or empty player list with a blank player', () => {
-    const restored = normalizeStoredSession({
+    const restored = normalizeSession({
       version: SESSION_VERSION,
       players: [],
       courts: 1,
@@ -69,25 +68,25 @@ describe('session persistence', () => {
     session.theme = 'dark';
 
     expect(deserializeSession(serializeSession(session)).theme).toBe('dark');
-    expect(normalizeStoredSession({
+    expect(normalizeSession({
       version: SESSION_VERSION,
       players: session.players,
       theme: 'midnight'
     }).theme).toBe('system');
   });
 
-  it('uses localStorage through the browser adapter', async () => {
+  it('uses localStorage through the browser adapter', () => {
     const storage = {
-      getItem: jest.fn().mockReturnValue(null),
-      setItem: jest.fn(),
-      removeItem: jest.fn()
+      getItem: vi.fn().mockReturnValue(null),
+      setItem: vi.fn(),
+      removeItem: vi.fn()
     };
     const store = createBrowserSessionStore(storage);
     const session = createInitialSession();
     session.players[0].name = 'Browser player';
 
-    await store.save(session);
-    await store.clear();
+    store.save(session);
+    store.clear();
 
     expect(storage.setItem).toHaveBeenCalledWith(SESSION_KEY, serializeSession(session));
     expect(storage.removeItem).toHaveBeenCalledWith(SESSION_KEY);

@@ -1,15 +1,15 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import App from '../App';
-import { createInitialSession, serializeSession } from '../sessionPersistence';
+import { createInitialSession, serializeSession } from '../session';
 
 describe('theme UI', () => {
   beforeEach(() => {
     const query = {
       matches: false,
-      addEventListener: jest.fn(),
-      removeEventListener: jest.fn()
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn()
     };
-    window.matchMedia = jest.fn(() => query);
+    window.matchMedia = vi.fn(() => query);
     localStorage.clear();
     document.documentElement.removeAttribute('data-theme');
   });

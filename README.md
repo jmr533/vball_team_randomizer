@@ -1,6 +1,6 @@
 # Beach Volleyball Team Randomizer
 
-Fair beach-volleyball team rotation across 1-4 courts, built as a single-page React app.
+Fair beach-volleyball team rotation across 1-4 courts, built as a single-page React app with Vite.
 
 Website: https://vball-team-randomizer.vercel.app/
 
@@ -19,9 +19,11 @@ Open http://localhost:3000.
 npm run build
 ```
 
+Outputs a static site to `dist/`. `npm run preview` serves that build locally.
+
 ## Validation
 
-`npm run verify:web` runs the React tests once in CI mode and creates a production web build.
+`npm run verify:web` runs the Vitest suite once, lints `src/` with ESLint, and creates a production build.
 
 ## Local session behavior
 
@@ -38,9 +40,10 @@ npm test
 
 ## Files
 
-- `src/App.js` - main UI and team generation
+- `index.html` - Vite HTML entry; loads `src/main.jsx`
+- `src/App.jsx` - main UI and team generation
 - `src/gameHelpers.js` - game constants and fairness helpers
-- `src/Toast.js` / `src/useToast.js` - toast notifications
+- `src/Toast.jsx` / `src/useToast.js` - toast notifications
 - `src/session.js` - versioned session schema, serialization, and normalization
 - `src/sessionStorage.js` - `localStorage`-backed session store
 - `src/theme.js` - document theme helpers

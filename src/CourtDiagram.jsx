@@ -1,4 +1,3 @@
-import React from 'react';
 import { getPlayerName, getPlayersPerCourt } from './gameHelpers';
 
 export const MODE_NAMES = {

@@ -5,11 +5,12 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 ## Development Commands
 
 ### Core Development
-- `npm start` - Start development server (runs on http://localhost:3000)
-- `npm run build` - Build production bundle
-- `npm test` - Run tests with React Testing Library
-- `npm run verify:web` - Run tests in CI mode and build the web app
-- `npm run eject` - Eject from Create React App (irreversible)
+- `npm start` - Start Vite dev server (runs on http://localhost:3000)
+- `npm run build` - Build production bundle to `dist/`
+- `npm run preview` - Serve the production build locally
+- `npm test` - Run Vitest (watch mode) with React Testing Library
+- `npm run lint` - Lint `src/` with ESLint
+- `npm run verify:web` - Run tests once, lint, and build the web app
 
 ### Installation
 - `npm install` - Install all dependencies
@@ -17,10 +18,10 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 ## Project Architecture
 
 ### High-Level Structure
-A single-page React app with all UI and game logic under `src/`, deployed as a static site.
+A single-page React app built with Vite. `index.html` loads `src/main.jsx`; all UI and game logic live under `src/`. Deployed as a static site.
 
 ### Core Components and State Management
-- **App Component**: `src/App.js` owns UI state and team generation orchestration
+- **App Component**: `src/App.jsx` owns UI state and team generation orchestration
 - **Game Helpers**: `src/gameHelpers.js` holds constants, player utilities, and fairness/stat helpers
 - **State Management**: Uses React's `useState` for all state management:
   - `players`: Array of player objects with id, name, and preferredModes
@@ -37,17 +38,17 @@ A single-page React app with all UI and game logic under `src/`, deployed as a s
 ### Technical Architecture
 - **Styling**: Tailwind CSS for responsive design and component styling
 - **Icons**: Lucide React for consistent iconography
-- **Toasts**: `src/Toast.js` and `src/useToast.js` for user feedback
+- **Toasts**: `src/Toast.jsx` and `src/useToast.js` for user feedback
 - **Focus Management**: Keyboard navigation with automatic focus handling for player input
-- **Persistence**: `src/session.js` defines the versioned session schema; `src/sessionStorage.js` stores it in localStorage.
+- **Persistence**: `src/session.js` defines the versioned session schema; `src/sessionStorage.js` reads/writes it synchronously in localStorage. `App.jsx` restores the session in its initial state, so there is no loading phase.
 - **Theme**: `src/theme.js` applies Light/Dark/System in the document.
 
 ### Key Files
-- `src/App.js` - Main application component and team generation UI
+- `src/App.jsx` - Main application component and team generation UI
 - `src/gameHelpers.js` - Shared game logic, constants, and fairness helpers
-- `src/index.js` - React entry point
+- `src/main.jsx` - React entry point
 - `src/index.css` - Tailwind CSS imports
-- `src/Toast.js` - Toast notification component
+- `src/Toast.jsx` - Toast notification component
 - `src/useToast.js` - Toast state hook
 
 ### State Flow
@@ -58,6 +59,6 @@ A single-page React app with all UI and game logic under `src/`, deployed as a s
 5. Between rounds, waiting queue is derived from the previous game's sitting-out list
 
 ### Development Notes
-- Uses Create React App with standard ESLint configuration
+- Vite + Vitest (`vite.config.js`, jsdom, test globals); ESLint flat config in `eslint.config.js`. Files containing JSX use the `.jsx` extension.
 - Designed for static deployment on Vercel (or any static host) via `vercel.json`
 - Sessions persist in localStorage.

@@ -37,7 +37,7 @@ const normalizeGame = (game, index) => {
   };
 };
 
-/** The shared, versioned browser and native application session. */
+/** The versioned application session persisted between visits. */
 export const createInitialSession = () => ({
   players: [createPlayer()],
   courts: 1,

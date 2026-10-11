@@ -164,7 +164,6 @@ describe('Fairness Algorithm - Helper Functions', () => {
     });
 
     it('should ignore ineligible players sitting out', () => {
-      const eligiblePlayer = { id: '1', name: 'John', preferredModes: ['2v2'] };
       const ineligiblePlayer = { id: '2', name: 'Jane', preferredModes: ['3v3'] };
 
       const game = {
